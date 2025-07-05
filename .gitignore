@@ -1,3 +1,9 @@
 venv/
 __pycache__/
 .DS_Store
+<<<<<<< HEAD
+=======
+
+token.txt
+Docs/
+>>>>>>> 0c7e8fc (added new feature)
