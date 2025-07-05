@@ -184,26 +184,223 @@
 
         <!-- Fundamental Analysis Tab -->
         <div id="fundamentalTab" class="tab-content hidden">
-            <div class="bg-white shadow rounded-lg p-6">
+            <div class="bg-white shadow rounded-lg p-6 mb-8">
                 <h2 class="text-2xl font-bold mb-6 flex items-center">
                     <i class="fas fa-calculator mr-3 text-blue-600"></i>基本面分析
                 </h2>
-                <div class="text-center py-12 text-gray-500">
-                    <i class="fas fa-chart-pie text-4xl mb-4"></i>
-                    <p>请先在股票分析页面查询股票，然后切换到此页面查看基本面数据</p>
+                
+                <!-- Input Section -->
+                <div class="flex gap-3 mb-6">
+                    <input id="fundamentalTicker" type="text" placeholder="输入股票代码 (如: AAPL)" 
+                           class="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors">
+                    <button id="fundamentalSearchBtn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-chart-pie mr-2"></i>分析
+                    </button>
+                </div>
+
+                <!-- Loading State -->
+                <div id="fundamentalLoading" class="text-center py-8 hidden">
+                    <i class="fas fa-spinner loading text-2xl text-green-600"></i>
+                    <p class="mt-2 text-gray-600">正在分析基本面数据...</p>
+                </div>
+
+                <!-- Results -->
+                <div id="fundamentalResults" class="hidden">
+                    <!-- Company Info -->
+                    <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                        <h3 id="companyName" class="text-xl font-bold mb-2"></h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                                <p class="text-sm text-gray-600">行业</p>
+                                <p id="companySector" class="font-semibold"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">市值</p>
+                                <p id="marketCap" class="font-semibold"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">P/E比率</p>
+                                <p id="peRatio" class="font-semibold"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">P/B比率</p>
+                                <p id="pbRatio" class="font-semibold"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Financial Health Score -->
+                    <div class="bg-blue-50 p-6 rounded-lg mb-6">
+                        <h4 class="text-lg font-bold mb-4 text-blue-800">财务健康度评分</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div class="text-center">
+                                <div id="overallScore" class="text-3xl font-bold text-blue-600 mb-1"></div>
+                                <p class="text-sm text-gray-600">总体评分</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="profitabilityScore" class="text-2xl font-bold text-green-600 mb-1"></div>
+                                <p class="text-sm text-gray-600">盈利能力</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="liquidityScore" class="text-2xl font-bold text-yellow-600 mb-1"></div>
+                                <p class="text-sm text-gray-600">流动性</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="leverageScore" class="text-2xl font-bold text-purple-600 mb-1"></div>
+                                <p class="text-sm text-gray-600">财务杠杆</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="efficiencyScore" class="text-2xl font-bold text-indigo-600 mb-1"></div>
+                                <p class="text-sm text-gray-600">运营效率</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="growthScore" class="text-2xl font-bold text-pink-600 mb-1"></div>
+                                <p class="text-sm text-gray-600">成长性</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Strengths and Weaknesses -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h5 class="font-bold text-green-800 mb-3">✅ 优势</h5>
+                            <ul id="strengthsList" class="space-y-1 text-green-700"></ul>
+                        </div>
+                        <div class="bg-red-50 p-4 rounded-lg">
+                            <h5 class="font-bold text-red-800 mb-3">⚠️ 劣势</h5>
+                            <ul id="weaknessesList" class="space-y-1 text-red-700"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div id="fundamentalError" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <span id="fundamentalErrorText"></span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Risk Management Tab -->
         <div id="riskTab" class="tab-content hidden">
-            <div class="bg-white shadow rounded-lg p-6">
+            <div class="bg-white shadow rounded-lg p-6 mb-8">
                 <h2 class="text-2xl font-bold mb-6 flex items-center">
                     <i class="fas fa-shield-alt mr-3 text-blue-600"></i>风险管理
                 </h2>
-                <div class="text-center py-12 text-gray-500">
-                    <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
-                    <p>风险管理功能即将上线，敬请期待</p>
+                
+                <!-- Input Section -->
+                <div class="flex gap-3 mb-6">
+                    <input id="riskTicker" type="text" placeholder="输入股票代码 (如: AAPL)" 
+                           class="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors">
+                    <button id="riskAnalyzeBtn" class="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-shield-alt mr-2"></i>风险分析
+                    </button>
+                </div>
+
+                <!-- Loading State -->
+                <div id="riskLoading" class="text-center py-8 hidden">
+                    <i class="fas fa-spinner loading text-2xl text-red-600"></i>
+                    <p class="mt-2 text-gray-600">正在分析风险数据...</p>
+                </div>
+
+                <!-- Results -->
+                <div id="riskResults" class="hidden">
+                    <!-- Risk Overview -->
+                    <div class="bg-red-50 p-6 rounded-lg mb-6">
+                        <h4 class="text-lg font-bold mb-4 text-red-800">风险评估概览</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="text-center">
+                                <div id="riskLevel" class="text-3xl font-bold mb-2"></div>
+                                <p class="text-sm text-gray-600">风险等级</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="riskScore" class="text-3xl font-bold mb-2"></div>
+                                <p class="text-sm text-gray-600">风险评分</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="volatility" class="text-3xl font-bold mb-2"></div>
+                                <p class="text-sm text-gray-600">年化波动率</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VaR Analysis -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <h5 class="font-bold text-orange-800 mb-3">📊 VaR风险价值</h5>
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span>95%置信度VaR:</span>
+                                    <span id="var95" class="font-bold"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>99%置信度VaR:</span>
+                                    <span id="var99" class="font-bold"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>历史最大单日跌幅:</span>
+                                    <span id="worstDay" class="font-bold text-red-600"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-purple-50 p-4 rounded-lg">
+                            <h5 class="font-bold text-purple-800 mb-3">📈 回撤分析</h5>
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span>最大回撤:</span>
+                                    <span id="maxDrawdown" class="font-bold text-red-600"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>当前回撤:</span>
+                                    <span id="currentDrawdown" class="font-bold"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>平均恢复时间:</span>
+                                    <span id="recoveryTime" class="font-bold"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Position Sizing -->
+                    <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                        <h5 class="font-bold text-blue-800 mb-3">💰 仓位建议</h5>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="text-center">
+                                <div id="conservativePosition" class="text-xl font-bold text-green-600"></div>
+                                <p class="text-sm">保守建议</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="recommendedPosition" class="text-xl font-bold text-blue-600"></div>
+                                <p class="text-sm">推荐建议</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="aggressivePosition" class="text-xl font-bold text-orange-600"></div>
+                                <p class="text-sm">激进建议</p>
+                            </div>
+                            <div class="text-center">
+                                <div id="kellyPosition" class="text-xl font-bold text-purple-600"></div>
+                                <p class="text-sm">凯利公式</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Risk Warnings -->
+                    <div id="riskWarnings" class="bg-yellow-50 p-4 rounded-lg">
+                        <h5 class="font-bold text-yellow-800 mb-3">⚠️ 风险提示</h5>
+                        <ul id="riskWarningsList" class="space-y-1 text-yellow-700"></ul>
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div id="riskError" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <span id="riskErrorText"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -471,6 +668,215 @@
 
         function hideError() {
             document.getElementById('errorMessage').classList.add('hidden');
+        }
+
+        // Fundamental Analysis Functions
+        document.getElementById('fundamentalSearchBtn').addEventListener('click', analyzeFundamental);
+        document.getElementById('fundamentalTicker').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                analyzeFundamental();
+            }
+        });
+
+        async function analyzeFundamental() {
+            const ticker = document.getElementById('fundamentalTicker').value.trim().toUpperCase();
+            if (!ticker) {
+                showFundamentalError('请输入股票代码');
+                return;
+            }
+
+            showFundamentalLoading();
+            hideFundamentalError();
+
+            try {
+                // Get financial metrics
+                const response = await fetch(`/fundamental/${ticker}`);
+                const healthResponse = await fetch(`/fundamental/${ticker}/health`);
+                
+                if (!response.ok || !healthResponse.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || '获取基本面数据失败');
+                }
+
+                const metrics = await response.json();
+                const health = await healthResponse.json();
+
+                displayFundamentalData(metrics, health);
+            } catch (error) {
+                showFundamentalError(`分析失败: ${error.message}`);
+                console.error('基本面分析失败:', error);
+            } finally {
+                hideFundamentalLoading();
+            }
+        }
+
+        function displayFundamentalData(metrics, health) {
+            document.getElementById('fundamentalResults').classList.remove('hidden');
+
+            // Company Info
+            document.getElementById('companyName').textContent = metrics.company_name || metrics.ticker;
+            document.getElementById('companySector').textContent = `${metrics.sector} - ${metrics.industry}`;
+            document.getElementById('marketCap').textContent = metrics.market_cap ? 
+                `$${(metrics.market_cap / 1e9).toFixed(1)}B` : 'N/A';
+            document.getElementById('peRatio').textContent = metrics.pe_ratio ? 
+                metrics.pe_ratio.toFixed(1) : 'N/A';
+            document.getElementById('pbRatio').textContent = metrics.pb_ratio ? 
+                metrics.pb_ratio.toFixed(1) : 'N/A';
+
+            // Health Scores
+            document.getElementById('overallScore').textContent = health.overall_score.toFixed(1);
+            document.getElementById('profitabilityScore').textContent = health.profitability_score.toFixed(1);
+            document.getElementById('liquidityScore').textContent = health.liquidity_score.toFixed(1);
+            document.getElementById('leverageScore').textContent = health.leverage_score.toFixed(1);
+            document.getElementById('efficiencyScore').textContent = health.efficiency_score.toFixed(1);
+            document.getElementById('growthScore').textContent = health.growth_score.toFixed(1);
+
+            // Strengths and Weaknesses
+            document.getElementById('strengthsList').innerHTML = health.strengths.map(s => 
+                `<li class="flex items-start"><i class="fas fa-check text-green-600 mt-1 mr-2"></i>${s}</li>`
+            ).join('');
+            
+            document.getElementById('weaknessesList').innerHTML = health.weaknesses.map(w => 
+                `<li class="flex items-start"><i class="fas fa-times text-red-600 mt-1 mr-2"></i>${w}</li>`
+            ).join('');
+        }
+
+        function showFundamentalLoading() {
+            document.getElementById('fundamentalLoading').classList.remove('hidden');
+            document.getElementById('fundamentalResults').classList.add('hidden');
+        }
+
+        function hideFundamentalLoading() {
+            document.getElementById('fundamentalLoading').classList.add('hidden');
+        }
+
+        function showFundamentalError(message) {
+            const errorDiv = document.getElementById('fundamentalError');
+            const errorText = document.getElementById('fundamentalErrorText');
+            errorText.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function hideFundamentalError() {
+            document.getElementById('fundamentalError').classList.add('hidden');
+        }
+
+        // Risk Management Functions
+        document.getElementById('riskAnalyzeBtn').addEventListener('click', analyzeRisk);
+        document.getElementById('riskTicker').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                analyzeRisk();
+            }
+        });
+
+        async function analyzeRisk() {
+            const ticker = document.getElementById('riskTicker').value.trim().toUpperCase();
+            if (!ticker) {
+                showRiskError('请输入股票代码');
+                return;
+            }
+
+            showRiskLoading();
+            hideRiskError();
+
+            try {
+                // Get comprehensive risk analysis
+                const response = await fetch(`/risk/${ticker}/comprehensive`);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || '获取风险数据失败');
+                }
+
+                const risk = await response.json();
+                displayRiskData(risk);
+            } catch (error) {
+                showRiskError(`风险分析失败: ${error.message}`);
+                console.error('风险分析失败:', error);
+            } finally {
+                hideRiskLoading();
+            }
+        }
+
+        function displayRiskData(risk) {
+            document.getElementById('riskResults').classList.remove('hidden');
+
+            // Risk Overview
+            document.getElementById('riskLevel').textContent = risk.overall_risk_level;
+            document.getElementById('riskLevel').className = `text-3xl font-bold mb-2 ${getRiskColor(risk.overall_risk_level)}`;
+            document.getElementById('riskScore').textContent = `${risk.risk_score.toFixed(1)}/100`;
+            
+            // VaR Analysis
+            if (risk.var_analysis) {
+                document.getElementById('var95').textContent = risk.var_analysis.historical_var ? 
+                    `${risk.var_analysis.historical_var.toFixed(2)}%` : 'N/A';
+                document.getElementById('worstDay').textContent = risk.var_analysis.worst_day_loss ? 
+                    `${risk.var_analysis.worst_day_loss.toFixed(2)}%` : 'N/A';
+            }
+
+            // Drawdown Analysis
+            if (risk.drawdown_analysis) {
+                document.getElementById('maxDrawdown').textContent = risk.drawdown_analysis.max_drawdown ? 
+                    `${risk.drawdown_analysis.max_drawdown.toFixed(2)}%` : 'N/A';
+                document.getElementById('currentDrawdown').textContent = risk.drawdown_analysis.current_drawdown ? 
+                    `${risk.drawdown_analysis.current_drawdown.toFixed(2)}%` : 'N/A';
+                document.getElementById('recoveryTime').textContent = risk.drawdown_analysis.recovery_time_avg ? 
+                    `${risk.drawdown_analysis.recovery_time_avg.toFixed(0)}天` : 'N/A';
+            }
+
+            // Volatility
+            if (risk.volatility_analysis) {
+                document.getElementById('volatility').textContent = risk.volatility_analysis.annualized_volatility ? 
+                    `${risk.volatility_analysis.annualized_volatility.toFixed(1)}%` : 'N/A';
+            }
+
+            // Position Sizing
+            if (risk.position_sizing) {
+                document.getElementById('conservativePosition').textContent = risk.position_sizing.conservative_position ? 
+                    `${risk.position_sizing.conservative_position.toFixed(1)}%` : 'N/A';
+                document.getElementById('recommendedPosition').textContent = risk.position_sizing.recommended_position ? 
+                    `${risk.position_sizing.recommended_position.toFixed(1)}%` : 'N/A';
+                document.getElementById('aggressivePosition').textContent = risk.position_sizing.aggressive_position ? 
+                    `${risk.position_sizing.aggressive_position.toFixed(1)}%` : 'N/A';
+                document.getElementById('kellyPosition').textContent = risk.position_sizing.kelly_percentage ? 
+                    `${risk.position_sizing.kelly_percentage.toFixed(1)}%` : 'N/A';
+            }
+
+            // Risk Warnings
+            const warnings = risk.risk_mitigation_suggestions || [];
+            document.getElementById('riskWarningsList').innerHTML = warnings.map(w => 
+                `<li class="flex items-start"><i class="fas fa-exclamation-triangle text-yellow-600 mt-1 mr-2"></i>${w}</li>`
+            ).join('');
+        }
+
+        function getRiskColor(riskLevel) {
+            switch(riskLevel) {
+                case 'LOW': return 'text-green-600';
+                case 'MEDIUM': return 'text-yellow-600';
+                case 'HIGH': return 'text-orange-600';
+                case 'EXTREME': return 'text-red-600';
+                default: return 'text-gray-600';
+            }
+        }
+
+        function showRiskLoading() {
+            document.getElementById('riskLoading').classList.remove('hidden');
+            document.getElementById('riskResults').classList.add('hidden');
+        }
+
+        function hideRiskLoading() {
+            document.getElementById('riskLoading').classList.add('hidden');
+        }
+
+        function showRiskError(message) {
+            const errorDiv = document.getElementById('riskError');
+            const errorText = document.getElementById('riskErrorText');
+            errorText.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function hideRiskError() {
+            document.getElementById('riskError').classList.add('hidden');
         }
     </script>
 </body>
