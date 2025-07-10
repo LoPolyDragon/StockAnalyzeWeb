@@ -12,25 +12,36 @@ logger = logging.getLogger(__name__)
 # 简单内存缓存
 _cache = {}
 _cache_timeout = 300  # 5分钟缓存
+_last_request_time = 0
+_min_request_interval = 2.0  # 最小请求间隔（秒）
 
 
-def with_retry(max_retries: int = 3, delay: float = 1.0):
+def with_retry(max_retries: int = 3, delay: float = 2.0):
     """重试装饰器"""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            global _last_request_time
             last_exception = None
             for attempt in range(max_retries):
                 try:
-                    return func(*args, **kwargs)
+                    # 确保请求间隔
+                    current_time = time.time()
+                    time_since_last_request = current_time - _last_request_time
+                    if time_since_last_request < _min_request_interval:
+                        time.sleep(_min_request_interval - time_since_last_request)
+                    
+                    result = func(*args, **kwargs)
+                    _last_request_time = time.time()
+                    return result
                 except Exception as e:
                     last_exception = e
                     if attempt < max_retries - 1:
-                        logger.warning(f"尝试 {attempt + 1} 失败: {e}, {delay}秒后重试...")
-                        time.sleep(delay * (attempt + 1))  # 指数退避
+                        wait_time = delay * (2 ** attempt)  # 指数退避
+                        logger.warning(f"尝试 {attempt + 1} 失败: {e}, {wait_time}秒后重试...")
+                        time.sleep(wait_time)
                     else:
                         logger.error(f"所有重试都失败: {e}")
-            
             raise last_exception
         return wrapper
     return decorator
@@ -60,30 +71,45 @@ def _save_to_cache(cache_key: str, data: pd.DataFrame):
     logger.info(f"数据已缓存: {cache_key}")
 
 
-@with_retry(max_retries=3, delay=1.0)
+@with_retry(max_retries=3, delay=2.0)
 def _fetch_from_yfinance(ticker: str, period: str, interval: str) -> pd.DataFrame:
     """从yfinance获取数据"""
     logger.info(f"从yfinance获取数据: {ticker}, period={period}, interval={interval}")
-    ticker_obj = yf.Ticker(ticker)
-    hist = ticker_obj.history(period=period, interval=interval, timeout=10)
-    
-    if hist.empty:
-        raise ValueError(f"yfinance返回空数据: {ticker}")
-    
-    return hist
+    try:
+        yf.pdr_override()  # 使用pandas_datareader作为备用
+        hist = pdr.get_data_yahoo(ticker, period=period, interval=interval)
+        
+        if hist.empty:
+            raise ValueError(f"yfinance返回空数据: {ticker}")
+        
+        return hist
+    except Exception as e:
+        logger.error(f"yfinance获取失败: {e}")
+        # 尝试直接使用yfinance作为备用
+        ticker_obj = yf.Ticker(ticker)
+        hist = ticker_obj.history(period=period, interval=interval, timeout=20)
+        
+        if hist.empty:
+            raise ValueError(f"yfinance备用方法也返回空数据: {ticker}")
+        
+        return hist
 
 
-@with_retry(max_retries=2, delay=2.0)
+@with_retry(max_retries=2, delay=3.0)
 def _fetch_from_stooq(ticker: str) -> pd.DataFrame:
     """从stooq获取数据作为备用"""
     logger.info(f"从stooq获取备用数据: {ticker}")
-    hist = pdr.DataReader(ticker, "stooq")
-    
-    if hist.empty:
-        raise ValueError(f"stooq返回空数据: {ticker}")
-    
-    hist.sort_index(inplace=True)
-    return hist
+    try:
+        hist = pdr.DataReader(ticker, "stooq")
+        
+        if hist.empty:
+            raise ValueError(f"stooq返回空数据: {ticker}")
+        
+        hist.sort_index(inplace=True)
+        return hist
+    except Exception as e:
+        logger.error(f"stooq获取失败: {e}")
+        raise
 
 
 def get_stock_data(ticker: str, period: str = "3mo") -> pd.DataFrame:
@@ -120,12 +146,14 @@ def get_stock_data(ticker: str, period: str = "3mo") -> pd.DataFrame:
     interval = period_interval_map.get(period, "1d")
     
     hist = None
+    errors = []
     
     # 主数据源：yfinance
     try:
         hist = _fetch_from_yfinance(ticker, period, interval)
         logger.info(f"成功从yfinance获取 {ticker} 数据，共 {len(hist)} 条记录")
     except Exception as e:
+        errors.append(f"yfinance: {str(e)}")
         logger.warning(f"yfinance获取失败: {e}")
     
     # 备用数据源：stooq (仅当主数据源失败时)
@@ -134,11 +162,13 @@ def get_stock_data(ticker: str, period: str = "3mo") -> pd.DataFrame:
             hist = _fetch_from_stooq(ticker)
             logger.info(f"成功从stooq获取 {ticker} 备用数据，共 {len(hist)} 条记录")
         except Exception as e:
+            errors.append(f"stooq: {str(e)}")
             logger.warning(f"stooq备用数据源也失败: {e}")
     
     # 如果所有数据源都失败
     if hist is None or hist.empty:
-        logger.error(f"所有数据源都无法获取 {ticker} 的数据")
+        error_msg = " | ".join(errors)
+        logger.error(f"所有数据源都无法获取 {ticker} 的数据: {error_msg}")
         return pd.DataFrame()  # 返回空DataFrame
     
     # 数据清理和验证

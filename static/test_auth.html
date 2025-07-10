@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试登录</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input {
+            padding: 8px;
+            width: 300px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>测试登录</h1>
+    
+    <div class="form-group">
+        <label for="email">邮箱:</label>
+        <input type="email" id="email" placeholder="输入邮箱">
+    </div>
+    
+    <div class="form-group">
+        <label for="password">密码:</label>
+        <input type="password" id="password" placeholder="输入密码">
+    </div>
+    
+    <button id="loginBtn">登录</button>
+    <button id="registerBtn">注册</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        document.getElementById('loginBtn').addEventListener('click', async function() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showResult('请输入邮箱和密码', 'error');
+                return;
+            }
+            
+            try {
+                showResult('正在登录...', 'info');
+                
+                console.log('尝试登录...');
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
+                
+                console.log('登录响应:', response);
+                
+                const data = await response.json();
+                console.log('登录数据:', data);
+                
+                if (response.ok) {
+                    showResult('登录成功! Token: ' + data.access_token, 'success');
+                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.setItem('refresh_token', data.refresh_token);
+                    localStorage.setItem('user_info', JSON.stringify(data.user));
+                } else {
+                    showResult('登录失败: ' + (data.detail || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('登录请求失败:', error);
+                showResult('请求错误: ' + error.message, 'error');
+            }
+        });
+        
+        document.getElementById('registerBtn').addEventListener('click', async function() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showResult('请输入邮箱和密码', 'error');
+                return;
+            }
+            
+            try {
+                showResult('正在注册...', 'info');
+                
+                console.log('尝试注册...');
+                const response = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        full_name: null,
+                        password: password,
+                        auth_provider: 'email'
+                    })
+                });
+                
+                console.log('注册响应:', response);
+                
+                const data = await response.json();
+                console.log('注册数据:', data);
+                
+                if (response.ok) {
+                    showResult('注册成功! 请检查邮箱进行验证。', 'success');
+                } else {
+                    showResult('注册失败: ' + (data.detail || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('注册请求失败:', error);
+                showResult('请求错误: ' + error.message, 'error');
+            }
+        });
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = type;
+        }
+    </script>
+</body>
+</html> 

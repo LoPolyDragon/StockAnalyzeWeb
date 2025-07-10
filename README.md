@@ -1,6 +1,19 @@
 # Stock AI Advisor 🚀
 
-专业级股票投资AI助手，集成技术面分析、基本面分析、风险管理、投资组合管理于一体。
+专业级股票投资AI助手，集成技术面分析、基本面分析、风险管理、投资组合管理和用户认证于一体。
+
+## ✨ 最新功能
+
+### 📊 K线图显示
+- **多图表类型**：支持线图和K线图切换
+- **完整OHLC数据**：显示开盘价、最高价、最低价、收盘价
+- **公司名称显示**：自动获取并显示股票对应的公司名称
+
+### 🔐 用户认证系统
+- **注册登录**：安全的用户注册和登录功能
+- **JWT认证**：基于JWT令牌的安全认证机制
+- **权限管理**：不同用户权限级别管理
+- **安全防护**：密码加密存储，防止数据泄露
 
 ## 🌟 核心功能
 
@@ -62,15 +75,46 @@ pip install futu-api
 # 推荐始终使用如下命令激活虚拟环境：
 source venv/bin/activate
 
-# 运行 cli.py
+# 4. 运行服务
+# 方法1：使用uvicorn直接启动（推荐开发时使用，支持热重载）
+uvicorn stock_api.main:app --reload --host 0.0.0.0 --port 8080
+
+# 方法2：使用CLI启动
 python cli.py
+
+# 或指定自定义端口
+python cli.py --port 9000
 ```
 
-访问 `http://127.0.0.1:8000` 开始使用！
+### 访问网站
+
+服务启动后，你可以通过以下链接访问网站：
+
+1. **主页面**：http://localhost:8080
+   - 这是网站的主界面，提供股票分析和投资组合管理功能
+
+2. **用户登录/注册**：http://localhost:8080/auth.html
+   - 在使用高级功能前需要先注册账号并登录
+
+3. **API文档**：
+   - Swagger UI：http://localhost:8080/docs
+   - ReDoc：http://localhost:8080/redoc
+   - 这里提供了所有API的详细文档和测试界面
+
+4. **测试登录页面**：http://localhost:8080/test_auth.html
+   - 这是一个简化版的登录页面，用于测试认证功能
+
+### 常见问题
+
+1. 如果端口8080被占用，可以使用其他端口（如8000、9000等）
+2. 确保在访问时使用正确的端口号（与启动命令中指定的端口相同）
+3. 如果遇到"Address already in use"错误，说明端口被占用，请尝试其他端口
+4. 本地访问时使用localhost或127.0.0.1，如果需要局域网访问，使用本机IP地址
 
 ## 📱 使用方式
 
 ### 1. Web界面（推荐）
+- **用户认证**：安全的注册登录系统
 - **股票分析**：输入股票代码获取全面分析报告
 - **基本面分析**：深度财务数据和行业对比
 - **风险管理**：专业风险评估和仓位建议
@@ -78,17 +122,26 @@ python cli.py
 
 ### 2. API接口
 ```bash
+# 用户认证
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user","password":"password","email":"user@example.com"}'
+
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user","password":"password"}'
+
 # 股票基础数据
-curl http://localhost:8000/stock/AAPL
+curl http://localhost:8080/stock/AAPL
 
 # 基本面分析
-curl http://localhost:8000/fundamental/AAPL
+curl http://localhost:8080/fundamental/AAPL
 
 # 风险分析
-curl http://localhost:8000/risk/AAPL/comprehensive
+curl http://localhost:8080/risk/AAPL/comprehensive
 
 # 投资组合
-curl http://localhost:8000/portfolios
+curl http://localhost:8080/portfolios
 ```
 
 ### 3. CLI命令行
@@ -96,6 +149,10 @@ curl http://localhost:8000/portfolios
 # 快速查询
 python cli.py AAPL
 python cli.py 00700.HK  # 港股
+
+# 或使用启动脚本
+./start.sh
+./start.sh -p 9000  # 指定端口
 ```
 
 ## 🏗️ 项目架构
@@ -111,19 +168,24 @@ stock-ai-advisor/
 │   ├── portfolio_service.py  # 投资组合管理
 │   ├── stock_service.py      # 数据获取服务
 │   ├── news_service.py       # 新闻数据
-│   └── market_service.py     # 市场概况
+│   ├── market_service.py     # 市场概况
+│   ├── auth_service.py       # 用户认证服务
+│   ├── auth_routes.py        # 认证API路由
+│   └── auth_models.py        # 认证数据模型
 ├── templates/
-│   └── index.html            # 前端界面
+│   ├── index.html            # 前端界面
+│   └── auth.html             # 认证页面
 ├── tests/                    # 测试文件
 ├── cli.py                    # 命令行入口
+├── start.sh                  # 启动脚本
 └── requirements.txt          # 依赖清单
 ```
 
 ## 🔧 API文档
 
 启动服务后访问：
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+- Swagger UI: `http://localhost:8080/docs`
+- ReDoc: `http://localhost:8080/redoc`
 
 ## 🎯 核心特性
 
@@ -179,9 +241,24 @@ from futu.trade.open_trade_context import OpenSecTradeContext
 
 - 不要直接 from futu import TrdSide 等，否则会报 ImportError。
 
-## 🐛 虚拟环境常见问题排查
+## 🐛 依赖问题排查
 
-- 如果激活虚拟环境后依然提示找不到模块（如 uvicorn、futu），请确认 pip 安装路径和 python 运行路径一致：
+### 缺少模块错误
+如果遇到 `ModuleNotFoundError`（如 sqlalchemy、jwt、bcrypt 等），请确保已安装所有依赖：
+
+```bash
+# 激活虚拟环境
+source venv/bin/activate
+
+# 安装所有依赖
+pip install -r requirements.txt
+
+# 或单独安装缺失的模块
+pip install sqlalchemy pyjwt bcrypt
+```
+
+### 虚拟环境常见问题
+- 如果激活虚拟环境后依然提示找不到模块，请确认 pip 安装路径和 python 运行路径一致：
 
 ```bash
 which python
@@ -201,4 +278,31 @@ rm -rf venv
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+```
+
+### 端口配置与冲突解决
+默认情况下，服务运行在端口 8080 上。如果需要更改端口：
+
+```bash
+# 通过命令行参数指定端口
+python cli.py --port 9000
+
+# 通过启动脚本指定端口
+./start.sh -p 9000
+
+# 通过环境变量指定端口（仅当直接运行main.py时）
+PORT=9000 python stock_api/main.py
+```
+
+如果启动时提示端口被占用：
+
+```bash
+# 查找占用端口的进程
+lsof -i :8080
+
+# 杀死占用进程
+kill -9 <PID>
+
+# 或使用start.sh脚本，它会自动尝试清理被占用的端口
+./start.sh
 ```

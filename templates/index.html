@@ -5,8 +5,140 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock AI Advisor - 专业级股票投资AI助手</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js 核心库 (用于线图) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- TradingView Lightweight Charts (用于K线图) -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <!-- 用户认证脚本 -->
+    <script>
+        // 检查用户登录状态
+        function checkAuthStatus() {
+            const token = localStorage.getItem('access_token');
+            const userInfo = localStorage.getItem('user_info');
+            
+            if (token && userInfo) {
+                const user = JSON.parse(userInfo);
+                showUserInfo(user);
+                loadUserData();
+            } else {
+                showLoginButton();
+            }
+        }
+        
+        function showUserInfo(user) {
+            const authContainer = document.getElementById('authContainer');
+            if (authContainer) {
+                authContainer.innerHTML = `
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            ${user.avatar_url ? 
+                                `<img src="${user.avatar_url}" alt="头像" class="w-8 h-8 rounded-full">` : 
+                                `<div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                                    ${user.full_name ? user.full_name.charAt(0) : user.email.charAt(0)}
+                                </div>`
+                            }
+                            <span class="text-gray-700 font-medium">${user.full_name || user.email}</span>
+                        </div>
+                        <button onclick="logout()" class="text-gray-500 hover:text-gray-700 transition-colors">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        function showLoginButton() {
+            const authContainer = document.getElementById('authContainer');
+            if (authContainer) {
+                authContainer.innerHTML = `
+                    <a href="/auth.html" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-sign-in-alt mr-2"></i>登录
+                    </a>
+                `;
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user_info');
+            window.location.reload();
+        }
+        
+        async function loadUserData() {
+            const token = localStorage.getItem('access_token');
+            if (!token) return;
+            
+            try {
+                // 加载用户关注列表
+                const watchlistResponse = await fetch('/auth/watchlists', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (watchlistResponse.ok) {
+                    const watchlists = await watchlistResponse.json();
+                    updateWatchlistUI(watchlists);
+                }
+                
+                // 加载用户投资组合
+                const portfolioResponse = await fetch('/auth/portfolios', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (portfolioResponse.ok) {
+                    const portfolios = await portfolioResponse.json();
+                    updatePortfolioUI(portfolios);
+                }
+            } catch (error) {
+                console.error('加载用户数据失败:', error);
+            }
+        }
+        
+        function updateWatchlistUI(watchlists) {
+            // 如果有用户关注列表，可以在这里更新UI
+            console.log('用户关注列表:', watchlists);
+        }
+        
+        function updatePortfolioUI(portfolios) {
+            // 如果有用户投资组合，可以在这里更新UI
+            console.log('用户投资组合:', portfolios);
+        }
+        
+        // 页面加载时检查认证状态
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            initPortfolioViewToggle();
+        });
+    </script>
+
+    <script>
+        // 确保脚本正确加载
+        window.addEventListener('load', function() {
+            console.log('页面加载完成，检查图表库');
+            
+            // 检查Chart.js是否加载
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js未加载，尝试重新加载');
+                const chartScript = document.createElement('script');
+                chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js';
+                document.head.appendChild(chartScript);
+            } else {
+                console.log('Chart.js已加载');
+            }
+            
+            // 检查TradingView Lightweight Charts是否加载
+            if (typeof LightweightCharts === 'undefined') {
+                console.error('TradingView图表库未加载，尝试重新加载');
+                const tvScript = document.createElement('script');
+                tvScript.src = 'https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js';
+                document.head.appendChild(tvScript);
+            } else {
+                console.log('TradingView图表库已加载');
+            }
+        });
+    </script>
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -30,6 +162,19 @@
             25% { transform: translateX(-5px); }
             75% { transform: translateX(5px); }
         }
+        .line-clamp-2 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .news-tab-btn {
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .news-tab-btn.active {
+            border-bottom-color: #3b82f6;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
@@ -43,6 +188,9 @@
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm opacity-90">专业级股票投资AI助手</span>
+                    <div id="authContainer">
+                        <!-- 认证状态将在这里显示 -->
+                    </div>
                     <i class="fas fa-robot text-xl"></i>
                 </div>
             </div>
@@ -53,7 +201,10 @@
         <!-- Navigation Tabs -->
         <div class="bg-white shadow rounded-lg mb-8">
             <nav class="flex border-b">
-                <button id="tabStock" class="tab-btn px-6 py-4 font-semibold text-blue-600 tab-active">
+                <button id="tabDashboard" class="tab-btn px-6 py-4 font-semibold text-blue-600 tab-active">
+                    <i class="fas fa-tachometer-alt mr-2"></i>市场仪表板
+                </button>
+                <button id="tabStock" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
                     <i class="fas fa-chart-candlestick mr-2"></i>股票分析
                 </button>
                 <button id="tabFundamental" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
@@ -65,76 +216,201 @@
                 <button id="tabPortfolio" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
                     <i class="fas fa-briefcase mr-2"></i>投资组合
                 </button>
+                <button id="tabTools" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
+                    <i class="fas fa-calculator mr-2"></i>投资工具
+                </button>
             </nav>
         </div>
 
-        <!-- Stock Analysis Tab -->
-        <div id="stockTab" class="tab-content">
-            <!-- Market Overview -->
-            <div class="bg-white shadow rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-6 flex items-center">
-                    <i class="fas fa-globe-americas mr-3 text-blue-600"></i>市场概览
-                </h2>
-                <div id="marketLoading" class="text-center py-8">
-                    <i class="fas fa-spinner loading text-2xl text-blue-600"></i>
-                    <p class="mt-2 text-gray-600">正在加载市场数据...</p>
-                </div>
-                <div id="marketData" class="hidden">
-                    <div id="indices" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="bg-green-50 p-4 rounded-lg">
-                            <h3 class="font-semibold mb-3 text-green-800 flex items-center">
-                                <i class="fas fa-arrow-up mr-2"></i>涨幅榜
-                            </h3>
-                            <ul id="gainers" class="space-y-2"></ul>
+        <!-- Stock Search Section (Always Visible) -->
+        <div class="bg-white shadow rounded-lg p-6 mb-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-search mr-3 text-blue-600"></i>智能股票分析
+            </h2>
+            <div class="flex gap-3 mb-4">
+                <input id="mainTicker" type="text" placeholder="输入股票代码 (如: AAPL, TSLA, MSFT)" 
+                       class="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:border-blue-500 transition-colors">
+                <button id="mainSearchBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors text-lg">
+                    <i class="fas fa-search mr-2"></i>智能分析
+                </button>
+            </div>
+            
+            <!-- Quick Stock Buttons -->
+            <div class="flex flex-wrap gap-2">
+                <span class="text-sm font-medium text-gray-700 self-center mr-2">热门股票:</span>
+                <button class="quick-stock-btn px-3 py-1 rounded border border-gray-300 hover:bg-blue-100 text-sm" data-symbol="AAPL">AAPL</button>
+                <button class="quick-stock-btn px-3 py-1 rounded border border-gray-300 hover:bg-blue-100 text-sm" data-symbol="TSLA">TSLA</button>
+                <button class="quick-stock-btn px-3 py-1 rounded border border-gray-300 hover:bg-blue-100 text-sm" data-symbol="MSFT">MSFT</button>
+                <button class="quick-stock-btn px-3 py-1 rounded border border-gray-300 hover:bg-blue-100 text-sm" data-symbol="GOOGL">GOOGL</button>
+                <button class="quick-stock-btn px-3 py-1 rounded border border-gray-300 hover:bg-blue-100 text-sm" data-symbol="NVDA">NVDA</button>
+                <button class="quick-stock-btn px-3 py-1 rounded border border-gray-300 hover:bg-blue-100 text-sm" data-symbol="META">META</button>
+                <button class="quick-stock-btn px-3 py-1 rounded border border-gray-300 hover:bg-blue-100 text-sm" data-symbol="AMZN">AMZN</button>
+            </div>
+            
+            <!-- Loading State -->
+            <div id="mainSearchLoading" class="text-center py-8 hidden">
+                <i class="fas fa-spinner loading text-2xl text-blue-600"></i>
+                <p class="mt-2 text-gray-600">正在进行智能分析...</p>
+            </div>
+        </div>
+
+        <!-- Market Dashboard Tab -->
+        <div id="dashboardTab" class="tab-content">
+            <!-- Market Indices -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">S&P 500</h3>
+                        <i class="fas fa-chart-line text-blue-600"></i>
+                    </div>
+                    <div class="flex items-end justify-between">
+                        <div>
+                            <div id="spxPrice" class="text-2xl font-bold text-gray-900">4,320.45</div>
+                            <div id="spxChange" class="text-sm text-green-600">+12.34 (+0.29%)</div>
                         </div>
-                        <div class="bg-red-50 p-4 rounded-lg">
-                            <h3 class="font-semibold mb-3 text-red-800 flex items-center">
-                                <i class="fas fa-arrow-down mr-2"></i>跌幅榜
-                            </h3>
-                            <ul id="losers" class="space-y-2"></ul>
+                        <div class="w-16 h-12">
+                            <canvas id="spxMiniChart" class="w-full h-full"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">NASDAQ</h3>
+                        <i class="fas fa-microchip text-purple-600"></i>
+                    </div>
+                    <div class="flex items-end justify-between">
+                        <div>
+                            <div id="nasdaqPrice" class="text-2xl font-bold text-gray-900">13,456.78</div>
+                            <div id="nasdaqChange" class="text-sm text-red-600">-25.67 (-0.19%)</div>
+                        </div>
+                        <div class="w-16 h-12">
+                            <canvas id="nasdaqMiniChart" class="w-full h-full"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">DOW</h3>
+                        <i class="fas fa-industry text-green-600"></i>
+                    </div>
+                    <div class="flex items-end justify-between">
+                        <div>
+                            <div id="dowPrice" class="text-2xl font-bold text-gray-900">34,567.89</div>
+                            <div id="dowChange" class="text-sm text-green-600">+89.12 (+0.26%)</div>
+                        </div>
+                        <div class="w-16 h-12">
+                            <canvas id="dowMiniChart" class="w-full h-full"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Stock Search -->
-            <div class="bg-white shadow rounded-lg p-6 mb-8">
-                <h3 class="text-xl font-bold mb-4 flex items-center">
-                    <i class="fas fa-search mr-3 text-blue-600"></i>股票查询
-                </h3>
-                <div class="flex gap-3 mb-4">
-                    <input id="ticker" type="text" placeholder="输入股票代码 (如: AAPL, 00700.HK)" 
-                           class="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors">
-                    <button id="searchBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
-                        <i class="fas fa-search mr-2"></i>查询
-                    </button>
+            
+            <!-- Market Heatmap and Stats -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Sector Heatmap -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-th mr-3 text-orange-600"></i>行业热力图
+                    </h3>
+                    <div id="sectorHeatmap" class="grid grid-cols-2 gap-2">
+                        <!-- Sector boxes will be populated here -->
+                    </div>
                 </div>
                 
-                <!-- Period Selector -->
-                <div id="periodSelector" class="flex flex-wrap gap-2 mb-6 hidden">
-                    <span class="text-sm font-medium text-gray-700 self-center mr-2">时间周期:</span>
-                    <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="1d">1日</button>
-                    <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="1wk">1周</button>
-                    <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="1mo">1月</button>
-                    <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="3mo">3月</button>
-                    <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="6mo">6月</button>
-                    <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="1y">1年</button>
-                    <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="2y">2年</button>
+                <!-- Market Sentiment -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-heart-pulse mr-3 text-red-600"></i>市场情绪
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">恐惧贪婪指数</span>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-24 bg-gray-200 rounded-full h-2">
+                                    <div id="fearGreedBar" class="bg-green-500 h-2 rounded-full" style="width: 75%"></div>
+                                </div>
+                                <span id="fearGreedValue" class="text-sm font-medium">75 (贪婪)</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">VIX 波动率</span>
+                            <span id="vixValue" class="font-medium">18.45</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">上涨股票比例</span>
+                            <span id="advanceDecline" class="font-medium text-green-600">68%</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">新高/新低比</span>
+                            <span id="highLowRatio" class="font-medium">3.2</span>
+                        </div>
+                    </div>
                 </div>
-
-                <!-- Loading State -->
-                <div id="searchLoading" class="text-center py-8 hidden">
-                    <i class="fas fa-spinner loading text-2xl text-blue-600"></i>
-                    <p class="mt-2 text-gray-600">正在分析股票数据...</p>
+            </div>
+            
+            <!-- Top Gainers and Losers -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Top Gainers -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-arrow-trend-up mr-3 text-green-600"></i>今日涨幅榜
+                    </h3>
+                    <div id="topGainers" class="space-y-3">
+                        <!-- Top gainers will be populated here -->
+                    </div>
                 </div>
+                
+                <!-- Top Losers -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-arrow-trend-down mr-3 text-red-600"></i>今日跌幅榜
+                    </h3>
+                    <div id="topLosers" class="space-y-3">
+                        <!-- Top losers will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Volume Leaders and News -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Volume Leaders -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-volume-high mr-3 text-blue-600"></i>成交量排行
+                    </h3>
+                    <div id="volumeLeaders" class="space-y-3">
+                        <!-- Volume leaders will be populated here -->
+                    </div>
+                </div>
+                
+                <!-- Market News -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-newspaper mr-3 text-purple-600"></i>市场快讯
+                    </h3>
+                    <div id="dashboardNews" class="space-y-3">
+                        <!-- News will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <!-- Stock Analysis Tab -->
+        <div id="stockTab" class="tab-content hidden">
+            <!-- Stock Analysis Results -->
+            <div id="stockAnalysisResults" class="hidden">
                 <!-- Stock Result -->
-                <div id="result" class="hidden">
+                <div class="bg-white shadow rounded-lg p-6 mb-8">
                     <div class="flex items-center gap-4 mb-6">
                         <div id="badge" class="px-4 py-2 rounded-lg text-white text-lg font-bold"></div>
                         <div>
                             <h2 id="tickerLabel" class="text-2xl font-bold"></h2>
+                            <p id="companyNameLabel" class="text-lg text-gray-700"></p>
                             <p id="priceInfo" class="text-gray-600"></p>
                         </div>
                     </div>
@@ -144,68 +420,79 @@
                         <ul id="reasonsList" class="space-y-1"></ul>
                     </div>
 
-                    <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                        <canvas id="priceChart" height="100"></canvas>
+                    <!-- Period Selector -->
+                    <div id="periodSelector" class="flex flex-wrap gap-2 mb-6">
+                        <span class="text-sm font-medium text-gray-700 self-center mr-2">图表类型:</span>
+                        <button class="chart-type-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm bg-blue-500 text-white" data-type="line">线图</button>
+                        <button class="chart-type-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-type="candlestick">K线图</button>
+                        
+                        <span class="text-sm font-medium text-gray-700 self-center ml-4 mr-2">时间周期:</span>
+                        <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="1d">1日</button>
+                        <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="1wk">1周</button>
+                        <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="1mo">1月</button>
+                        <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm bg-blue-500 text-white" data-period="3mo">3月</button>
+                        <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="6mo">6月</button>
+                        <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="1y">1年</button>
+                        <button class="period-btn px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 text-sm" data-period="2y">2年</button>
                     </div>
 
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div class="bg-white p-4 rounded border text-center">
-                            <p class="text-sm text-gray-600">当前价格</p>
-                            <p id="price" class="text-lg font-bold"></p>
+                    <!-- 增加图表高度 -->
+                    <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                        <h4 class="font-semibold mb-4 text-gray-800">价格走势</h4>
+                        <div id="chartContainer" style="height: 500px;">
+                            <canvas id="priceChart"></canvas>
+                            <div id="candlestickChart"></div>
                         </div>
-                        <div class="bg-white p-4 rounded border text-center">
-                            <p class="text-sm text-gray-600">开盘价</p>
-                            <p id="open" class="text-lg font-bold"></p>
-                        </div>
-                        <div class="bg-white p-4 rounded border text-center">
-                            <p class="text-sm text-gray-600">最高价</p>
-                            <p id="high" class="text-lg font-bold text-green-600"></p>
-                        </div>
-                        <div class="bg-white p-4 rounded border text-center">
-                            <p class="text-sm text-gray-600">最低价</p>
-                            <p id="low" class="text-lg font-bold text-red-600"></p>
-                        </div>
-                        <div class="bg-white p-4 rounded border text-center">
-                            <p class="text-sm text-gray-600">成交量</p>
-                            <p id="volume" class="text-lg font-bold"></p>
+                    </div>
+                    
+                    <div class="bg-white p-4 rounded-lg">
+                        <h4 class="font-semibold mb-4 text-gray-800">重要提醒</h4>
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-yellow-700">
+                                        <strong>投资有风险，决策需谨慎。</strong> 本分析仅供参考，不构成投资建议。请结合自身情况做出投资决策。
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Error Message -->
-                <div id="errorMessage" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-exclamation-triangle mr-2"></i>
-                        <span id="errorText"></span>
-                    </div>
+            <!-- Empty State for Stock Analysis -->
+            <div id="stockAnalysisEmpty" class="bg-white shadow rounded-lg p-6">
+                <div class="text-center py-12">
+                    <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-gray-600 mb-2">还没有分析任何股票</h3>
+                    <p class="text-gray-500 mb-6">请使用顶部的智能股票分析功能来查看详细的股票分析报告</p>
+                    <button onclick="focusMainSearch()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-arrow-up mr-2"></i>去搜索股票
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Fundamental Analysis Tab -->
         <div id="fundamentalTab" class="tab-content hidden">
-            <div class="bg-white shadow rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-6 flex items-center">
-                    <i class="fas fa-calculator mr-3 text-blue-600"></i>基本面分析
-                </h2>
-                
-                <!-- Input Section -->
-                <div class="flex gap-3 mb-6">
-                    <input id="fundamentalTicker" type="text" placeholder="输入股票代码 (如: AAPL)" 
-                           class="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors">
-                    <button id="fundamentalSearchBtn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
-                        <i class="fas fa-chart-pie mr-2"></i>分析
-                    </button>
-                </div>
+            <!-- Fundamental Analysis Results -->
+            <div id="fundamentalAnalysisResults" class="hidden">
+                <div class="bg-white shadow rounded-lg p-6 mb-8">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <i class="fas fa-calculator mr-3 text-blue-600"></i>基本面分析
+                    </h2>
 
-                <!-- Loading State -->
-                <div id="fundamentalLoading" class="text-center py-8 hidden">
-                    <i class="fas fa-spinner loading text-2xl text-green-600"></i>
-                    <p class="mt-2 text-gray-600">正在分析基本面数据...</p>
-                </div>
+                    <!-- Loading State -->
+                    <div id="fundamentalLoading" class="text-center py-8 hidden">
+                        <i class="fas fa-spinner loading text-2xl text-green-600"></i>
+                        <p class="mt-2 text-gray-600">正在分析基本面数据...</p>
+                    </div>
 
-                <!-- Results -->
-                <div id="fundamentalResults" class="hidden">
+                    <!-- Results -->
+                    <div id="fundamentalResult" class="hidden">
                     <!-- Company Info -->
                     <div class="bg-gray-50 p-4 rounded-lg mb-6">
                         <h3 id="companyName" class="text-xl font-bold mb-2"></h3>
@@ -273,40 +560,46 @@
                     </div>
                 </div>
 
-                <!-- Error Message -->
-                <div id="fundamentalError" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-exclamation-triangle mr-2"></i>
-                        <span id="fundamentalErrorText"></span>
+                    <!-- Error Message -->
+                    <div id="fundamentalError" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            <span id="fundamentalErrorText"></span>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Empty State for Fundamental Analysis -->
+            <div id="fundamentalAnalysisEmpty" class="bg-white shadow rounded-lg p-6">
+                <div class="text-center py-12">
+                    <i class="fas fa-calculator text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-gray-600 mb-2">基本面分析需要先选择股票</h3>
+                    <p class="text-gray-500 mb-6">请先使用顶部的智能股票分析功能，基本面分析会自动显示</p>
+                    <button onclick="focusMainSearch()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-arrow-up mr-2"></i>去分析股票
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Risk Management Tab -->
         <div id="riskTab" class="tab-content hidden">
-            <div class="bg-white shadow rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-6 flex items-center">
-                    <i class="fas fa-shield-alt mr-3 text-blue-600"></i>风险管理
-                </h2>
-                
-                <!-- Input Section -->
-                <div class="flex gap-3 mb-6">
-                    <input id="riskTicker" type="text" placeholder="输入股票代码 (如: AAPL)" 
-                           class="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors">
-                    <button id="riskAnalyzeBtn" class="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
-                        <i class="fas fa-shield-alt mr-2"></i>风险分析
-                    </button>
-                </div>
+            <!-- Risk Analysis Results -->
+            <div id="riskAnalysisResults" class="hidden">
+                <div class="bg-white shadow rounded-lg p-6 mb-8">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <i class="fas fa-shield-alt mr-3 text-blue-600"></i>风险管理
+                    </h2>
 
-                <!-- Loading State -->
-                <div id="riskLoading" class="text-center py-8 hidden">
-                    <i class="fas fa-spinner loading text-2xl text-red-600"></i>
-                    <p class="mt-2 text-gray-600">正在分析风险数据...</p>
-                </div>
+                    <!-- Loading State -->
+                    <div id="riskLoading" class="text-center py-8 hidden">
+                        <i class="fas fa-spinner loading text-2xl text-red-600"></i>
+                        <p class="mt-2 text-gray-600">正在分析风险数据...</p>
+                    </div>
 
-                <!-- Results -->
-                <div id="riskResults" class="hidden">
+                    <!-- Results -->
+                    <div id="riskResult" class="hidden">
                     <!-- Risk Overview -->
                     <div class="bg-red-50 p-6 rounded-lg mb-6">
                         <h4 class="text-lg font-bold mb-4 text-red-800">风险评估概览</h4>
@@ -395,29 +688,742 @@
                     </div>
                 </div>
 
-                <!-- Error Message -->
-                <div id="riskError" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-exclamation-triangle mr-2"></i>
-                        <span id="riskErrorText"></span>
+                    <!-- Error Message -->
+                    <div id="riskError" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            <span id="riskErrorText"></span>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Empty State for Risk Analysis -->
+            <div id="riskAnalysisEmpty" class="bg-white shadow rounded-lg p-6">
+                <div class="text-center py-12">
+                    <i class="fas fa-shield-alt text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-gray-600 mb-2">风险分析需要先选择股票</h3>
+                    <p class="text-gray-500 mb-6">请先使用顶部的智能股票分析功能，风险管理会自动显示</p>
+                    <button onclick="focusMainSearch()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-arrow-up mr-2"></i>去分析股票
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Portfolio Tab -->
         <div id="portfolioTab" class="tab-content hidden">
-            <div class="bg-white shadow rounded-lg p-6">
-                <h2 class="text-2xl font-bold mb-6 flex items-center">
-                    <i class="fas fa-briefcase mr-3 text-blue-600"></i>投资组合管理
-                </h2>
-                <div class="text-center py-12 text-gray-500">
-                    <i class="fas fa-folder-open text-4xl mb-4"></i>
-                    <p>投资组合管理功能正在开发中</p>
+            <!-- Portfolio Management Header -->
+            <div class="bg-white shadow rounded-lg p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold flex items-center">
+                        <i class="fas fa-briefcase mr-3 text-blue-600"></i>智能投资组合管理
+                    </h2>
+                    <div class="flex space-x-3">
+                        <button id="createPortfolioBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-plus mr-2"></i>手动组合
+                        </button>
+                        <button id="createAutoPortfolioBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-robot mr-2"></i>AI自动组合
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Portfolio Type Filter -->
+                <div class="flex flex-wrap gap-2">
+                    <button class="portfolio-filter-btn px-3 py-1 rounded text-sm bg-blue-500 text-white" data-filter="all">
+                        全部
+                    </button>
+                    <button class="portfolio-filter-btn px-3 py-1 rounded text-sm border hover:bg-gray-100" data-filter="manual">
+                        手动管理
+                    </button>
+                    <button class="portfolio-filter-btn px-3 py-1 rounded text-sm border hover:bg-gray-100" data-filter="auto">
+                        AI自动
+                    </button>
+                    <button class="portfolio-filter-btn px-3 py-1 rounded text-sm border hover:bg-gray-100" data-filter="hybrid">
+                        混合模式
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="portfolioLoading" class="bg-white shadow rounded-lg p-6 text-center hidden">
+                <i class="fas fa-spinner loading text-2xl text-blue-600"></i>
+                <p class="mt-2 text-gray-600">正在加载投资组合...</p>
+            </div>
+
+            <!-- Portfolio List -->
+            <div id="portfolioList" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"></div>
+
+            <!-- Empty State -->
+            <div id="portfolioEmpty" class="bg-white shadow rounded-lg p-6 text-center hidden">
+                <i class="fas fa-briefcase text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">还没有投资组合</h3>
+                <p class="text-gray-500 mb-6">创建您的第一个投资组合，开始智能投资之旅</p>
+                <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors" onclick="showCreatePortfolioModal()">
+                    <i class="fas fa-plus mr-2"></i>创建第一个投资组合
+                </button>
+            </div>
+
+            <!-- Portfolio Details -->
+            <div id="portfolioDetails" class="bg-white shadow rounded-lg p-6 hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <div class="flex items-center space-x-3">
+                            <h3 id="portfolioDetailsName" class="text-xl font-bold"></h3>
+                            <span id="portfolioModeIndicator" class="px-2 py-1 rounded text-xs font-medium"></span>
+                            <span id="portfolioStatusIndicator" class="px-2 py-1 rounded text-xs font-medium"></span>
+                        </div>
+                        <p id="portfolioDetailsDesc" class="text-gray-600"></p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="toggleModeBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg hidden">
+                            <i class="fas fa-exchange-alt mr-2"></i>切换模式
+                        </button>
+                        <button id="runAIAnalysisBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg hidden">
+                            <i class="fas fa-brain mr-2"></i>AI分析
+                        </button>
+                        <button id="executeAIBtn" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg hidden">
+                            <i class="fas fa-play mr-2"></i>执行AI推荐
+                        </button>
+                        <button id="editPortfolioBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-edit mr-2"></i>编辑
+                        </button>
+                        <button id="deletePortfolioBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-trash mr-2"></i>删除
+                        </button>
+                        <button id="addHoldingBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-plus mr-2"></i>添加持仓
+                        </button>
+                        <button id="backToListBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-arrow-left mr-2"></i>返回列表
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Auto Trading Status (for automated portfolios) -->
+                <div id="autoTradingStatus" class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg mb-6 hidden">
+                    <h4 class="font-bold text-indigo-800 mb-3 flex items-center">
+                        <i class="fas fa-robot mr-2"></i>AI自动交易状态
+                    </h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <p class="text-gray-600">AI分析状态</p>
+                            <p id="aiAnalysisStatus" class="font-medium"></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600">今日交易次数</p>
+                            <p id="dailyTradesCount" class="font-medium"></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600">下次执行时间</p>
+                            <p id="nextExecutionTime" class="font-medium"></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600">可用资金</p>
+                            <p id="availableCash" class="font-medium text-green-600"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- AI Recommendations -->
+                <div id="aiRecommendations" class="bg-green-50 p-4 rounded-lg mb-6 hidden">
+                    <h4 class="font-bold text-green-800 mb-3 flex items-center">
+                        <i class="fas fa-lightbulb mr-2"></i>AI股票推荐
+                        <span id="recommendationCount" class="ml-2 px-2 py-1 bg-green-200 text-green-800 text-xs rounded-full"></span>
+                    </h4>
+                    <div id="recommendationsList" class="space-y-3"></div>
+                    <div class="mt-4 text-center">
+                        <button id="refreshRecommendationsBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm">
+                            <i class="fas fa-refresh mr-2"></i>刷新推荐
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Portfolio Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    <div class="bg-white shadow rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">总市值</h3>
+                            <i class="fas fa-wallet text-blue-600"></i>
+                        </div>
+                        <div id="portfolioTotalValue" class="text-2xl font-bold text-gray-900">$0.00</div>
+                        <div class="text-sm text-gray-600 mt-1">投资组合价值</div>
+                    </div>
+                    
+                    <div class="bg-white shadow rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">总盈亏</h3>
+                            <i class="fas fa-chart-line text-green-600"></i>
+                        </div>
+                        <div id="portfolioTotalPnL" class="text-2xl font-bold">$0.00</div>
+                        <div class="text-sm text-gray-600 mt-1">绝对收益</div>
+                    </div>
+                    
+                    <div class="bg-white shadow rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">盈亏率</h3>
+                            <i class="fas fa-percentage text-purple-600"></i>
+                        </div>
+                        <div id="portfolioTotalPnLPct" class="text-2xl font-bold">0.00%</div>
+                        <div class="text-sm text-gray-600 mt-1">收益率</div>
+                    </div>
+                    
+                    <div class="bg-white shadow rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">持仓数量</h3>
+                            <i class="fas fa-building text-yellow-600"></i>
+                        </div>
+                        <div id="portfolioHoldingsCount" class="text-2xl font-bold text-gray-900">0</div>
+                        <div class="text-sm text-gray-600 mt-1">股票数量</div>
+                    </div>
+                </div>
+
+                <!-- Holdings List -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-chart-pie mr-3 text-purple-600"></i>持仓明细
+                    </h3>
+                    
+                    <!-- Holdings Cards -->
+                    <div id="holdingsContainer" class="space-y-4">
+                        <!-- Holdings will be populated here as cards -->
+                    </div>
+                    
+                    <!-- Holdings Table (fallback for complex view) -->
+                    <div id="holdingsTableView" class="hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse bg-white">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="border border-gray-200 p-3 text-left text-sm font-medium text-gray-700">股票代码</th>
+                                        <th class="border border-gray-200 p-3 text-right text-sm font-medium text-gray-700">持仓数量</th>
+                                        <th class="border border-gray-200 p-3 text-right text-sm font-medium text-gray-700">成本价</th>
+                                        <th class="border border-gray-200 p-3 text-right text-sm font-medium text-gray-700">当前价</th>
+                                        <th class="border border-gray-200 p-3 text-right text-sm font-medium text-gray-700">市值</th>
+                                        <th class="border border-gray-200 p-3 text-right text-sm font-medium text-gray-700">盈亏</th>
+                                        <th class="border border-gray-200 p-3 text-right text-sm font-medium text-gray-700">盈亏率</th>
+                                        <th class="border border-gray-200 p-3 text-right text-sm font-medium text-gray-700">权重</th>
+                                        <th class="border border-gray-200 p-3 text-center text-sm font-medium text-gray-700">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="holdingsTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- View Toggle -->
+                    <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+                        <div class="flex space-x-2">
+                            <button id="cardViewBtn" class="px-3 py-1 rounded text-sm bg-blue-500 text-white">
+                                <i class="fas fa-th-large mr-1"></i>卡片视图
+                            </button>
+                            <button id="tableViewBtn" class="px-3 py-1 rounded text-sm border hover:bg-gray-100">
+                                <i class="fas fa-table mr-1"></i>表格视图
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty Holdings -->
+                <div id="holdingsEmpty" class="bg-white shadow rounded-lg p-6 text-center hidden">
+                    <i class="fas fa-chart-line text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-gray-600 mb-2">暂无持仓</h3>
+                    <p class="text-gray-500 mb-6">此投资组合还没有任何股票持仓</p>
+                    <button class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors" onclick="showAddHoldingModal()">
+                        <i class="fas fa-plus mr-2"></i>添加第一个持仓
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Portfolio Modal -->
+        <div id="createPortfolioModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-lg font-bold mb-4">创建新投资组合</h3>
+                <form id="createPortfolioForm">
+                    <div class="mb-4">
+                        <label for="portfolioName" class="block text-sm font-medium text-gray-700 mb-2">组合名称</label>
+                        <input type="text" id="portfolioName" name="name" required 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="mb-6">
+                        <label for="portfolioDescription" class="block text-sm font-medium text-gray-700 mb-2">描述（可选）</label>
+                        <textarea id="portfolioDescription" name="description" rows="3"
+                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="hideCreatePortfolioModal()" 
+                                class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            取消
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            创建
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add Holding Modal -->
+        <div id="addHoldingModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-lg font-bold mb-4">添加持仓</h3>
+                <form id="addHoldingForm">
+                    <div class="mb-4">
+                        <label for="holdingTicker" class="block text-sm font-medium text-gray-700 mb-2">股票代码</label>
+                        <input type="text" id="holdingTicker" name="ticker" required placeholder="如: AAPL, 00700.HK"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label for="holdingShares" class="block text-sm font-medium text-gray-700 mb-2">持仓数量</label>
+                        <input type="number" id="holdingShares" name="shares" required step="0.01" min="0.01"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="mb-6">
+                        <label for="holdingCost" class="block text-sm font-medium text-gray-700 mb-2">成本价（每股）</label>
+                        <input type="number" id="holdingCost" name="cost_per_share" required step="0.01" min="0.01"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="hideAddHoldingModal()" 
+                                class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            取消
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            添加
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Create Automated Portfolio Modal -->
+        <div id="createAutoPortfolioModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+                <h3 class="text-lg font-bold mb-4 flex items-center">
+                    <i class="fas fa-robot mr-2 text-green-600"></i>创建AI自动投资组合
+                </h3>
+                <form id="createAutoPortfolioForm">
+                    <!-- Basic Information -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label for="autoPortfolioName" class="block text-sm font-medium text-gray-700 mb-2">组合名称</label>
+                            <input type="text" id="autoPortfolioName" name="name" required 
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="autoPortfolioMode" class="block text-sm font-medium text-gray-700 mb-2">投资模式</label>
+                            <select id="autoPortfolioMode" name="mode" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                                <option value="auto">完全自动</option>
+                                <option value="hybrid">混合模式</option>
+                                <option value="manual">手动管理</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="autoPortfolioDescription" class="block text-sm font-medium text-gray-700 mb-2">描述（可选）</label>
+                        <textarea id="autoPortfolioDescription" name="description" rows="2"
+                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"></textarea>
+                    </div>
+
+                    <!-- Budget Configuration -->
+                    <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-dollar-sign mr-2 text-green-600"></i>资金配置
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label for="totalBudget" class="block text-sm font-medium text-gray-700 mb-2">总预算 (USD)</label>
+                            <input type="number" id="totalBudget" name="total_budget" required min="1000" step="100" 
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="maxSinglePosition" class="block text-sm font-medium text-gray-700 mb-2">单股最大投资额 (USD)</label>
+                            <input type="number" id="maxSinglePosition" name="max_single_position" required min="100" step="50" 
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <!-- Trading API Configuration -->
+                    <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-link mr-2 text-blue-600"></i>交易API配置
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label for="apiProvider" class="block text-sm font-medium text-gray-700 mb-2">API提供商</label>
+                            <select id="apiProvider" name="api_provider" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                                <option value="paper_trading">纸上交易 (模拟)</option>
+                                <option value="alpaca">Alpaca</option>
+                                <option value="interactive_brokers">Interactive Brokers</option>
+                                <option value="td_ameritrade">TD Ameritrade</option>
+                                <option value="schwab">Charles Schwab</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="flex items-center space-x-2 text-sm">
+                                <input type="checkbox" id="isSandbox" name="is_sandbox" checked class="rounded">
+                                <span>沙盒/模拟环境</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label for="apiKey" class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                            <input type="text" id="apiKey" name="api_key" 
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="apiSecret" class="block text-sm font-medium text-gray-700 mb-2">API Secret</label>
+                            <input type="password" id="apiSecret" name="api_secret" 
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <!-- AI Strategy Configuration -->
+                    <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-brain mr-2 text-purple-600"></i>AI策略配置
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label for="riskTolerance" class="block text-sm font-medium text-gray-700 mb-2">风险承受度</label>
+                            <select id="riskTolerance" name="risk_tolerance" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                                <option value="conservative">保守型</option>
+                                <option value="moderate" selected>稳健型</option>
+                                <option value="aggressive">激进型</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="maxDailyTrades" class="block text-sm font-medium text-gray-700 mb-2">每日最大交易次数</label>
+                            <input type="number" id="maxDailyTrades" name="max_daily_trades" value="5" min="1" max="20" 
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="rebalanceFreq" class="block text-sm font-medium text-gray-700 mb-2">重新平衡频率</label>
+                            <select id="rebalanceFreq" name="rebalance_frequency" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                                <option value="daily" selected>每日</option>
+                                <option value="weekly">每周</option>
+                                <option value="monthly">每月</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label for="stopLossPct" class="block text-sm font-medium text-gray-700 mb-2">止损比例 (%)</label>
+                            <input type="number" id="stopLossPct" name="stop_loss_pct" value="10" min="1" max="50" step="0.5"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="takeProfitPct" class="block text-sm font-medium text-gray-700 mb-2">止盈比例 (%)</label>
+                            <input type="number" id="takeProfitPct" name="take_profit_pct" value="20" min="5" max="100" step="0.5"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="hideCreateAutoPortfolioModal()" 
+                                class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            取消
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <i class="fas fa-robot mr-2"></i>创建AI组合
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Mode Toggle Modal -->
+        <div id="modeToggleModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-lg font-bold mb-4">切换投资模式</h3>
+                <div class="space-y-3 mb-6">
+                    <label class="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="portfolioMode" value="manual" class="text-blue-600">
+                        <div>
+                            <p class="font-medium">手动管理</p>
+                            <p class="text-sm text-gray-600">完全手动控制买卖决策</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="portfolioMode" value="hybrid" class="text-blue-600">
+                        <div>
+                            <p class="font-medium">混合模式</p>
+                            <p class="text-sm text-gray-600">AI推荐，手动确认执行</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="portfolioMode" value="auto" class="text-blue-600">
+                        <div>
+                            <p class="font-medium">完全自动</p>
+                            <p class="text-sm text-gray-600">AI自动执行买卖决策</p>
+                        </div>
+                    </label>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="hideModeToggleModal()" 
+                            class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button type="button" onclick="confirmModeChange()" 
+                            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        确认切换
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
+        <!-- Investment Tools Tab -->
+        <div id="toolsTab" class="tab-content hidden">
+            <!-- Investment Tools Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 max-w-6xl mx-auto">
+                <!-- Stock Screener -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-filter mr-3 text-blue-600"></i>智能股票筛选器
+                    </h3>
+                    
+                    <!-- Screener Controls -->
+                    <div class="grid grid-cols-1 gap-4 mb-4">
+                        <!-- Quick Filters -->
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">市值范围</label>
+                                <select id="marketCapFilter" class="w-full border rounded px-2 py-1 text-sm">
+                                    <option value="">全部</option>
+                                    <option value="large">大盘股</option>
+                                    <option value="mid">中盘股</option>
+                                    <option value="small">小盘股</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">市盈率</label>
+                                <select id="peFilter" class="w-full border rounded px-2 py-1 text-sm">
+                                    <option value="">全部</option>
+                                    <option value="low">低估值</option>
+                                    <option value="medium">合理</option>
+                                    <option value="high">高估值</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">涨跌幅</label>
+                                <select id="priceChangeFilter" class="w-full border rounded px-2 py-1 text-sm">
+                                    <option value="">全部</option>
+                                    <option value="up5">涨幅>5%</option>
+                                    <option value="up2">涨幅>2%</option>
+                                    <option value="down2">跌幅>2%</option>
+                                    <option value="down5">跌幅>5%</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">行业</label>
+                                <select id="sectorFilter" class="w-full border rounded px-2 py-1 text-sm">
+                                    <option value="">全部行业</option>
+                                    <option value="technology">科技</option>
+                                    <option value="healthcare">医疗</option>
+                                    <option value="financial">金融</option>
+                                    <option value="consumer">消费</option>
+                                    <option value="energy">能源</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <button onclick="screenStocks()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+                            <i class="fas fa-search mr-1"></i>筛选股票
+                        </button>
+                        <button onclick="resetScreener()" class="bg-gray-500 text-white px-4 py-2 rounded text-sm hover:bg-gray-600">
+                            <i class="fas fa-undo mr-1"></i>重置
+                        </button>
+                    </div>
+                
+                <!-- Loading State -->
+                <div id="screenerLoading" class="text-center py-8 hidden">
+                    <i class="fas fa-spinner loading text-2xl text-blue-600"></i>
+                    <p class="mt-2 text-gray-600">正在筛选股票...</p>
+                </div>
+                
+                <!-- Results Table -->
+                <div id="screenerResults" class="hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">筛选结果</h3>
+                        <div class="text-sm text-gray-600">
+                            共找到 <span id="resultCount">0</span> 只股票
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse border border-gray-200">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="border border-gray-200 px-4 py-2 text-left">股票代码</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-left">公司名称</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-right">当前价格</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-right">涨跌幅</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-right">市值</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-right">市盈率</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-left">行业</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-left">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody">
+                                <!-- Results will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Empty State -->
+                <div id="screenerEmpty" class="text-center py-12 text-gray-500 hidden">
+                    <i class="fas fa-search text-4xl mb-4"></i>
+                    <p class="mb-4">点击"筛选股票"开始筛选</p>
+                    <p class="text-sm">根据您的条件筛选最符合的投资标的</p>
+                </div>
+            </div>
+            
+            <!-- Investment Calculators -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
+                
+                <!-- 复利计算器 -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-chart-line mr-3 text-green-600"></i>复利计算器
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">初始投资 (元)</label>
+                            <input type="number" id="compoundPrincipal" class="w-full border rounded-lg px-3 py-2" placeholder="100000" value="100000">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">年化收益率 (%)</label>
+                            <input type="number" id="compoundRate" class="w-full border rounded-lg px-3 py-2" placeholder="8" value="8" step="0.1">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">投资年限</label>
+                            <input type="number" id="compoundYears" class="w-full border rounded-lg px-3 py-2" placeholder="10" value="10">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">定期投入 (元/年)</label>
+                            <input type="number" id="compoundMonthly" class="w-full border rounded-lg px-3 py-2" placeholder="12000" value="0">
+                        </div>
+                        <button onclick="calculateCompound()" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                            计算复利
+                        </button>
+                        <div id="compoundResult" class="mt-4 p-4 bg-green-50 rounded-lg hidden">
+                            <h4 class="font-semibold text-green-800 mb-2">计算结果</h4>
+                            <div id="compoundResultContent"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 止损止盈计算器 -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-shield-alt mr-3 text-red-600"></i>止损止盈计算器
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">买入价格 (元)</label>
+                            <input type="number" id="entryPrice" class="w-full border rounded-lg px-3 py-2" placeholder="100" value="100" step="0.01">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">止损比例 (%)</label>
+                            <input type="number" id="stopLossPercent" class="w-full border rounded-lg px-3 py-2" placeholder="5" value="5" step="0.1">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">止盈比例 (%)</label>
+                            <input type="number" id="takeProfitPercent" class="w-full border rounded-lg px-3 py-2" placeholder="15" value="15" step="0.1">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">投资金额 (元)</label>
+                            <input type="number" id="investmentAmount" class="w-full border rounded-lg px-3 py-2" placeholder="10000" value="10000">
+                        </div>
+                        <button onclick="calculateStopLoss()" class="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
+                            计算止损止盈
+                        </button>
+                        <div id="stopLossResult" class="mt-4 p-4 bg-red-50 rounded-lg hidden">
+                            <h4 class="font-semibold text-red-800 mb-2">计算结果</h4>
+                            <div id="stopLossResultContent"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 仓位管理计算器 -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-balance-scale mr-3 text-blue-600"></i>仓位管理计算器
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">总资金 (元)</label>
+                            <input type="number" id="totalCapital" class="w-full border rounded-lg px-3 py-2" placeholder="1000000" value="1000000">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">单笔风险比例 (%)</label>
+                            <input type="number" id="riskPercent" class="w-full border rounded-lg px-3 py-2" placeholder="2" value="2" step="0.1">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">买入价格 (元)</label>
+                            <input type="number" id="positionEntryPrice" class="w-full border rounded-lg px-3 py-2" placeholder="100" value="100" step="0.01">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">止损价格 (元)</label>
+                            <input type="number" id="positionStopPrice" class="w-full border rounded-lg px-3 py-2" placeholder="95" value="95" step="0.01">
+                        </div>
+                        <button onclick="calculatePosition()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            计算仓位
+                        </button>
+                        <div id="positionResult" class="mt-4 p-4 bg-blue-50 rounded-lg hidden">
+                            <h4 class="font-semibold text-blue-800 mb-2">计算结果</h4>
+                            <div id="positionResultContent"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 风险收益比计算器 -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-chart-bar mr-3 text-purple-600"></i>风险收益比计算器
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">买入价格 (元)</label>
+                            <input type="number" id="rrEntryPrice" class="w-full border rounded-lg px-3 py-2" placeholder="100" value="100" step="0.01">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">目标价格 (元)</label>
+                            <input type="number" id="rrTargetPrice" class="w-full border rounded-lg px-3 py-2" placeholder="120" value="120" step="0.01">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">止损价格 (元)</label>
+                            <input type="number" id="rrStopPrice" class="w-full border rounded-lg px-3 py-2" placeholder="95" value="95" step="0.01">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">胜率估计 (%)</label>
+                            <input type="number" id="winRate" class="w-full border rounded-lg px-3 py-2" placeholder="60" value="60" step="1">
+                        </div>
+                        <button onclick="calculateRiskReward()" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                            计算风险收益比
+                        </button>
+                        <div id="riskRewardResult" class="mt-4 p-4 bg-purple-50 rounded-lg hidden">
+                            <h4 class="font-semibold text-purple-800 mb-2">计算结果</h4>
+                            <div id="riskRewardResultContent"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
 
     <!-- Footer -->
     <footer class="bg-gray-800 text-white py-8 mt-16">
@@ -429,6 +1435,7 @@
     <script>
         let chart = null;
         let currentTicker = '';
+        let currentChartType = 'line';  // 默认图表类型
 
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -451,11 +1458,71 @@
                 // Show corresponding tab content
                 const tabId = this.id.replace('tab', '').toLowerCase() + 'Tab';
                 document.getElementById(tabId).classList.remove('hidden');
+                
+                // Load data when dashboard tab is activated
+                if (tabId === 'dashboardTab') {
+                    loadMarketDashboard();
+                }
+                
+                // Show empty states for other tabs if no analysis has been done
+                if (tabId === 'stockTab' && document.getElementById('stockAnalysisResults').classList.contains('hidden')) {
+                    document.getElementById('stockAnalysisEmpty').classList.remove('hidden');
+                }
+                if (tabId === 'fundamentalTab' && document.getElementById('fundamentalAnalysisResults').classList.contains('hidden')) {
+                    document.getElementById('fundamentalAnalysisEmpty').classList.remove('hidden');
+                }
+                if (tabId === 'riskTab' && document.getElementById('riskAnalysisResults').classList.contains('hidden')) {
+                    document.getElementById('riskAnalysisEmpty').classList.remove('hidden');
+                }
             });
         });
 
-        // Load market data on page load
-        window.addEventListener('load', loadMarketData);
+        // Load market data and news on page load
+        window.addEventListener('load', function() {
+            loadMarketData();
+            loadNews();
+            
+            // Load dashboard data since it's the default tab
+            loadMarketDashboard();
+            startDashboardUpdates();
+            
+            // 主搜索功能事件监听器
+            setupMainSearchListeners();
+        });
+        
+        // 设置主搜索功能的事件监听器
+        function setupMainSearchListeners() {
+            // 主搜索按钮点击
+            document.getElementById('mainSearchBtn').addEventListener('click', function() {
+                const ticker = document.getElementById('mainTicker').value.trim();
+                if (ticker) {
+                    performIntelligentAnalysis(ticker);
+                } else {
+                    alert('请输入股票代码');
+                }
+            });
+            
+            // 主搜索框回车键
+            document.getElementById('mainTicker').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const ticker = this.value.trim();
+                    if (ticker) {
+                        performIntelligentAnalysis(ticker);
+                    } else {
+                        alert('请输入股票代码');
+                    }
+                }
+            });
+            
+            // 快捷股票按钮
+            document.querySelectorAll('.quick-stock-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const symbol = this.dataset.symbol;
+                    document.getElementById('mainTicker').value = symbol;
+                    performIntelligentAnalysis(symbol);
+                });
+            });
+        }
 
         async function loadMarketData() {
             try {
@@ -473,42 +1540,40 @@
         }
 
         function displayMarketData(data) {
-            // Display indices if available
-            if (data.indices) {
-                const indicesHtml = data.indices.map(index => `
-                    <div class="bg-blue-50 p-4 rounded-lg text-center">
-                        <h4 class="font-semibold">${index.name}</h4>
-                        <p class="text-2xl font-bold ${index.change >= 0 ? 'text-green-600' : 'text-red-600'}">
-                            ${index.price}
-                        </p>
-                        <p class="text-sm ${index.change >= 0 ? 'text-green-600' : 'text-red-600'}">
-                            ${index.change >= 0 ? '+' : ''}${index.change} (${index.change_percent}%)
-                        </p>
+            // Display indices
+            const indicesHtml = data.indices.map(index => `
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="font-semibold">${index.name}</h3>
+                            <p class="text-2xl font-bold mt-1">${index.price.toLocaleString()}</p>
+                        </div>
+                        <div class="${index.change_pct > 0 ? 'text-green-600' : 'text-red-600'} text-right">
+                            <p class="text-lg font-bold">${index.change > 0 ? '+' : ''}${index.change.toFixed(2)}</p>
+                            <p>${index.change_pct > 0 ? '+' : ''}${index.change_pct.toFixed(2)}%</p>
+                        </div>
                     </div>
-                `).join('');
-                document.getElementById('indices').innerHTML = indicesHtml;
-            }
+                </div>
+            `).join('');
+            document.getElementById('indices').innerHTML = indicesHtml;
 
-            // Display top gainers and losers
-            if (data.gainers) {
-                const gainersHtml = data.gainers.map(stock => `
-                    <li class="flex justify-between">
-                        <span class="font-medium">${stock.symbol}</span>
-                        <span class="text-green-600">+${stock.change}%</span>
-                    </li>
-                `).join('');
-                document.getElementById('gainers').innerHTML = gainersHtml;
-            }
+            // Display gainers
+            const gainersHtml = data.gainers.map(stock => `
+                <li class="flex justify-between bg-white px-3 py-2 rounded">
+                    <span class="font-medium">${stock.symbol}</span>
+                    <span class="text-green-600">+${stock.change}%</span>
+                </li>
+            `).join('');
+            document.getElementById('gainers').innerHTML = gainersHtml;
 
-            if (data.losers) {
-                const losersHtml = data.losers.map(stock => `
-                    <li class="flex justify-between">
-                        <span class="font-medium">${stock.symbol}</span>
-                        <span class="text-red-600">${stock.change}%</span>
-                    </li>
-                `).join('');
-                document.getElementById('losers').innerHTML = losersHtml;
-            }
+            // Display losers
+            const losersHtml = data.losers.map(stock => `
+                <li class="flex justify-between bg-white px-3 py-2 rounded">
+                    <span class="font-medium">${stock.symbol}</span>
+                    <span class="text-red-600">${stock.change}%</span>
+                </li>
+            `).join('');
+            document.getElementById('losers').innerHTML = losersHtml;
         }
 
         // Stock search functionality
@@ -535,7 +1600,28 @@
             });
         });
 
-        async function searchStock(period = '1mo') {
+        // Chart type selector
+        document.querySelectorAll('.chart-type-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.chart-type-btn').forEach(b => {
+                    b.classList.remove('bg-blue-500', 'text-white');
+                    b.classList.add('border-gray-300');
+                });
+                this.classList.add('bg-blue-500', 'text-white');
+                this.classList.remove('border-gray-300');
+                
+                currentChartType = this.dataset.type;
+                
+                if (currentTicker) {
+                    // 重新绘制当前数据的图表
+                    const activePeriodBtn = document.querySelector('.period-btn.bg-blue-500');
+                    const period = activePeriodBtn ? activePeriodBtn.dataset.period : '3mo';
+                    searchStock(period);
+                }
+            });
+        });
+
+        async function searchStock(period = '3mo') {
             const ticker = document.getElementById('ticker').value.trim().toUpperCase();
             if (!ticker) {
                 showError('请输入股票代码');
@@ -556,6 +1642,9 @@
 
                 displayStockData(data);
                 document.getElementById('periodSelector').classList.remove('hidden');
+                
+                // 更新新闻显示
+                updateNewsForStock(ticker);
             } catch (error) {
                 showError(`查询失败: ${error.message}`);
                 console.error('股票查询失败:', error);
@@ -579,6 +1668,7 @@
             }
 
             document.getElementById('tickerLabel').textContent = data.ticker;
+            document.getElementById('companyNameLabel').textContent = data.company_name || data.ticker;
             document.getElementById('price').textContent = `$${data.current_price}`;
             document.getElementById('open').textContent = `$${data.open}`;
             document.getElementById('high').textContent = `$${data.high}`;
@@ -595,54 +1685,165 @@
             drawChart(data.history);
         }
 
-        function drawChart(history) {
-            const ctx = document.getElementById('priceChart').getContext('2d');
+        function drawChart(history, isRetry = false) {
+            // 调试输出
+            console.log('绘制图表，数据:', history);
             
-            if (chart) {
-                chart.destroy();
-            }
-
+            // 清除之前的图表
+            const chartContainer = document.getElementById('priceChart');
+            chartContainer.innerHTML = '';
+            
+            // 准备数据
             const labels = history.map(item => item.date);
             const prices = history.map(item => item.close);
-
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '收盘价',
-                        data: prices,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
+            
+            if (currentChartType === 'line') {
+                // 线图 - 使用Chart.js，需要创建canvas元素
+                const canvas = document.createElement('canvas');
+                canvas.width = chartContainer.offsetWidth;
+                canvas.height = 400;
+                chartContainer.appendChild(canvas);
+                
+                const ctx = canvas.getContext('2d');
+                
+                if (chart) {
+                    chart.destroy();
+                }
+                
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '收盘价',
+                            data: prices,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
                     },
-                    scales: {
-                        x: {
-                            display: true,
-                            grid: {
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
                                 display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `价格: $${context.raw}`;
+                                    }
+                                }
                             }
                         },
-                        y: {
-                            display: true,
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
+                        scales: {
+                            x: {
+                                display: true,
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            },
+                            y: {
+                                display: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
                             }
                         }
                     }
+                });
+            } else {
+                // K线图 - 使用TradingView Lightweight Charts
+                try {
+                    console.log('尝试绘制K线图...');
+                    
+                    // 确保TradingView图表库已加载
+                    if (typeof LightweightCharts === 'undefined') {
+                        throw new Error('TradingView图表库未加载');
+                    }
+                    
+                    // 创建图表
+                    const chartOptions = {
+                        width: chartContainer.offsetWidth,
+                        height: 400,
+                        layout: {
+                            backgroundColor: '#ffffff',
+                            textColor: '#333',
+                        },
+                        grid: {
+                            vertLines: {
+                                color: 'rgba(197, 203, 206, 0.5)',
+                            },
+                            horzLines: {
+                                color: 'rgba(197, 203, 206, 0.5)',
+                            },
+                        },
+                        timeScale: {
+                            timeVisible: true,
+                            secondsVisible: false,
+                        },
+                    };
+                    
+                    // 创建图表实例
+                    const tvChart = LightweightCharts.createChart(chartContainer, chartOptions);
+                    
+                    // 准备K线数据
+                    const candleData = history.map(item => ({
+                        time: item.date.substring(0, 10), // 格式: YYYY-MM-DD
+                        open: parseFloat(item.open || item.close),
+                        high: parseFloat(item.high || item.close),
+                        low: parseFloat(item.low || item.close),
+                        close: parseFloat(item.close)
+                    }));
+                    
+                    // 添加K线数据系列
+                    const candleSeries = tvChart.addCandlestickSeries({
+                        upColor: '#26a69a',
+                        downColor: '#ef5350',
+                        borderVisible: false,
+                        wickUpColor: '#26a69a',
+                        wickDownColor: '#ef5350'
+                    });
+                    
+                    // 设置数据
+                    candleSeries.setData(candleData);
+                    
+                    // 调整时间范围以显示所有数据
+                    tvChart.timeScale().fitContent();
+                    
+                    // 保存图表引用以便后续清理
+                    chart = tvChart;
+                    
+                    console.log('K线图绘制完成');
+                } catch (e) {
+                    console.error('K线图绘制失败:', e);
+                    
+                    // 如果K线图失败，回退到线图
+                    console.warn('K线图加载失败，回退到线图显示');
+                    
+                    // 直接绘制线图，避免无限循环
+                    currentChartType = 'line';
+                    
+                    // 更新按钮状态
+                    document.querySelectorAll('.chart-type-btn').forEach(btn => {
+                        btn.classList.remove('bg-blue-500', 'text-white');
+                        btn.classList.add('border-gray-300', 'hover:bg-gray-100');
+                    });
+                    document.querySelector('.chart-type-btn[data-type="line"]').classList.add('bg-blue-500', 'text-white');
+                    
+                    // 重新绘制为线图（防止无限递归）
+                    if (!isRetry) {
+                        drawChart(history, true);
+                    }
                 }
-            });
+            }
         }
 
         function showLoading() {
@@ -655,14 +1856,12 @@
         }
 
         function showError(message) {
-            const errorDiv = document.getElementById('errorMessage');
-            const errorText = document.getElementById('errorText');
-            errorText.textContent = message;
-            errorDiv.classList.remove('hidden');
-            errorDiv.classList.add('error-shake');
-            
+            const errorEl = document.getElementById('errorMessage');
+            document.getElementById('errorText').textContent = message;
+            errorEl.classList.remove('hidden');
+            errorEl.classList.add('error-shake');
             setTimeout(() => {
-                errorDiv.classList.remove('error-shake');
+                errorEl.classList.remove('error-shake');
             }, 500);
         }
 
@@ -877,6 +2076,1568 @@
 
         function hideRiskError() {
             document.getElementById('riskError').classList.add('hidden');
+        }
+
+        // Portfolio Management Functions
+        let currentPortfolioId = null;
+
+        // Load portfolios when portfolio tab is activated
+        document.getElementById('tabPortfolio').addEventListener('click', loadPortfolios);
+
+        async function loadPortfolios() {
+            showPortfolioLoading();
+            try {
+                const response = await fetch('/portfolios');
+                if (response.ok) {
+                    const portfolios = await response.json();
+                    displayPortfolioList(portfolios);
+                } else {
+                    throw new Error('加载投资组合失败');
+                }
+            } catch (error) {
+                console.error('加载投资组合失败:', error);
+                document.getElementById('portfolioEmpty').classList.remove('hidden');
+            } finally {
+                hidePortfolioLoading();
+            }
+        }
+
+        function displayPortfolioList(portfolios) {
+            const portfolioList = document.getElementById('portfolioList');
+            const portfolioEmpty = document.getElementById('portfolioEmpty');
+            
+            if (portfolios.length === 0) {
+                portfolioList.innerHTML = '';
+                portfolioEmpty.classList.remove('hidden');
+                return;
+            }
+            
+            portfolioEmpty.classList.add('hidden');
+            
+            portfolioList.innerHTML = portfolios.map(portfolio => `
+                <div class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" 
+                     onclick="viewPortfolioDetails('${portfolio.id}')">
+                    <!-- Portfolio Header -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-briefcase text-blue-600 text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">${portfolio.name}</h3>
+                                <p class="text-sm text-gray-600">${portfolio.description || '智能投资组合'}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-gray-900">$${portfolio.total_value.toFixed(2)}</div>
+                            <div class="text-sm ${portfolio.total_pnl_pct >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                ${portfolio.total_pnl_pct >= 0 ? '+' : ''}${portfolio.total_pnl_pct.toFixed(2)}%
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Portfolio Metrics -->
+                    <div class="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
+                        <div class="text-center">
+                            <div class="text-sm text-gray-600">持仓数量</div>
+                            <div class="text-lg font-semibold text-gray-900">${portfolio.holdings_count}</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-sm text-gray-600">总盈亏</div>
+                            <div class="text-lg font-semibold ${portfolio.total_pnl >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                ${portfolio.total_pnl >= 0 ? '+' : ''}$${Math.abs(portfolio.total_pnl).toFixed(2)}
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-sm text-gray-600">类型</div>
+                            <div class="text-lg font-semibold text-purple-600">${portfolio.portfolio_type || '手动'}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function viewPortfolioDetails(portfolioId) {
+            currentPortfolioId = portfolioId;
+            showPortfolioLoading();
+            
+            try {
+                const response = await fetch(`/portfolio/${portfolioId}`);
+                if (response.ok) {
+                    const portfolio = await response.json();
+                    displayPortfolioDetails(portfolio);
+                } else {
+                    throw new Error('加载投资组合详情失败');
+                }
+            } catch (error) {
+                console.error('加载投资组合详情失败:', error);
+                alert('加载投资组合详情失败');
+            } finally {
+                hidePortfolioLoading();
+            }
+        }
+
+        function displayPortfolioDetails(portfolio) {
+            // Hide list, show details
+            document.querySelector('#portfolioTab .bg-white:first-child').classList.add('hidden');
+            document.getElementById('portfolioDetails').classList.remove('hidden');
+            
+            // Update portfolio info
+            document.getElementById('portfolioDetailsName').textContent = portfolio.name;
+            document.getElementById('portfolioDetailsDesc').textContent = portfolio.description || '暂无描述';
+            
+            // Update summary
+            document.getElementById('portfolioTotalValue').textContent = `$${portfolio.total_value.toFixed(2)}`;
+            document.getElementById('portfolioTotalPnL').textContent = `$${portfolio.total_pnl.toFixed(2)}`;
+            document.getElementById('portfolioTotalPnL').className = `text-2xl font-bold ${portfolio.total_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`;
+            document.getElementById('portfolioTotalPnLPct').textContent = `${portfolio.total_pnl_pct >= 0 ? '+' : ''}${portfolio.total_pnl_pct.toFixed(2)}%`;
+            document.getElementById('portfolioTotalPnLPct').className = `text-2xl font-bold ${portfolio.total_pnl_pct >= 0 ? 'text-green-600' : 'text-red-600'}`;
+            document.getElementById('portfolioHoldingsCount').textContent = portfolio.holdings.length;
+            
+            // Update holdings display
+            displayHoldings(portfolio.holdings);
+        }
+        
+        // 新的持仓显示函数
+        function displayHoldings(holdings) {
+            const holdingsContainer = document.getElementById('holdingsContainer');
+            const holdingsTableBody = document.getElementById('holdingsTableBody');
+            const holdingsEmpty = document.getElementById('holdingsEmpty');
+            const holdingsSection = holdingsContainer?.closest('.bg-white');
+            
+            if (holdings.length === 0) {
+                holdingsSection?.classList.add('hidden');
+                holdingsEmpty?.classList.remove('hidden');
+                return;
+            }
+            
+            holdingsEmpty?.classList.add('hidden');
+            holdingsSection?.classList.remove('hidden');
+            
+            // 卡片视图（默认）
+            if (holdingsContainer) {
+                holdingsContainer.innerHTML = holdings.map(holding => `
+                    <div class="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <span class="text-blue-600 font-bold text-sm">${holding.ticker}</span>
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-gray-900">${holding.ticker}</div>
+                                    <div class="text-sm text-gray-600">${holding.shares} 股</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-lg font-bold text-gray-900">$${holding.market_value.toFixed(2)}</div>
+                                <div class="text-sm ${holding.unrealized_pnl_pct >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                    ${holding.unrealized_pnl_pct >= 0 ? '+' : ''}${holding.unrealized_pnl_pct.toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <div class="text-gray-600">成本价</div>
+                                <div class="font-medium">$${holding.avg_cost.toFixed(2)}</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-600">当前价</div>
+                                <div class="font-medium">$${holding.current_price.toFixed(2)}</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-600">盈亏</div>
+                                <div class="font-medium ${holding.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                    ${holding.unrealized_pnl >= 0 ? '+' : ''}$${Math.abs(holding.unrealized_pnl).toFixed(2)}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-gray-600">权重</div>
+                                <div class="font-medium">${holding.weight.toFixed(1)}%</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end mt-3 pt-3 border-t border-gray-200">
+                            <button onclick="removeHolding('${holding.ticker}')" 
+                                    class="text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded hover:bg-red-50">
+                                <i class="fas fa-trash mr-1"></i>移除
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            // 表格视图
+            if (holdingsTableBody) {
+                holdingsTableBody.innerHTML = holdings.map(holding => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="border border-gray-200 p-3 font-medium">${holding.ticker}</td>
+                        <td class="border border-gray-200 p-3 text-right">${holding.shares}</td>
+                        <td class="border border-gray-200 p-3 text-right">$${holding.avg_cost.toFixed(2)}</td>
+                        <td class="border border-gray-200 p-3 text-right">$${holding.current_price.toFixed(2)}</td>
+                        <td class="border border-gray-200 p-3 text-right">$${holding.market_value.toFixed(2)}</td>
+                        <td class="border border-gray-200 p-3 text-right ${holding.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            $${holding.unrealized_pnl.toFixed(2)}
+                        </td>
+                        <td class="border border-gray-200 p-3 text-right ${holding.unrealized_pnl_pct >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            ${holding.unrealized_pnl_pct >= 0 ? '+' : ''}${holding.unrealized_pnl_pct.toFixed(2)}%
+                        </td>
+                        <td class="border border-gray-200 p-3 text-right">${holding.weight.toFixed(1)}%</td>
+                        <td class="border border-gray-200 p-3 text-center">
+                            <button onclick="removeHolding('${holding.ticker}')" 
+                                    class="text-red-600 hover:text-red-800 text-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+        
+        // 视图切换功能初始化
+        function initPortfolioViewToggle() {
+            const cardViewBtn = document.getElementById('cardViewBtn');
+            const tableViewBtn = document.getElementById('tableViewBtn');
+            const holdingsContainer = document.getElementById('holdingsContainer');
+            const holdingsTableView = document.getElementById('holdingsTableView');
+            
+            cardViewBtn?.addEventListener('click', function() {
+                holdingsContainer?.classList.remove('hidden');
+                holdingsTableView?.classList.add('hidden');
+                cardViewBtn.classList.add('bg-blue-500', 'text-white');
+                cardViewBtn.classList.remove('border', 'hover:bg-gray-100');
+                tableViewBtn?.classList.remove('bg-blue-500', 'text-white');
+                tableViewBtn?.classList.add('border', 'hover:bg-gray-100');
+            });
+            
+            tableViewBtn?.addEventListener('click', function() {
+                holdingsContainer?.classList.add('hidden');
+                holdingsTableView?.classList.remove('hidden');
+                tableViewBtn.classList.add('bg-blue-500', 'text-white');
+                tableViewBtn.classList.remove('border', 'hover:bg-gray-100');
+                cardViewBtn?.classList.remove('bg-blue-500', 'text-white');
+                cardViewBtn?.classList.add('border', 'hover:bg-gray-100');
+            });
+        }
+
+        function showPortfolioLoading() {
+            document.getElementById('portfolioLoading').classList.remove('hidden');
+        }
+
+        function hidePortfolioLoading() {
+            document.getElementById('portfolioLoading').classList.add('hidden');
+        }
+
+        // Modal functions
+        function showCreatePortfolioModal() {
+            document.getElementById('createPortfolioModal').classList.remove('hidden');
+        }
+
+        function hideCreatePortfolioModal() {
+            document.getElementById('createPortfolioModal').classList.add('hidden');
+            document.getElementById('createPortfolioForm').reset();
+        }
+
+        function showAddHoldingModal() {
+            document.getElementById('addHoldingModal').classList.remove('hidden');
+        }
+
+        function hideAddHoldingModal() {
+            document.getElementById('addHoldingModal').classList.add('hidden');
+            document.getElementById('addHoldingForm').reset();
+        }
+
+        // Event listeners
+        document.getElementById('createPortfolioBtn').addEventListener('click', showCreatePortfolioModal);
+        document.getElementById('addHoldingBtn').addEventListener('click', showAddHoldingModal);
+        document.getElementById('backToListBtn').addEventListener('click', backToPortfolioList);
+
+        document.getElementById('createPortfolioForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                name: formData.get('name'),
+                description: formData.get('description')
+            };
+            
+            try {
+                const response = await fetch('/portfolio', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    hideCreatePortfolioModal();
+                    loadPortfolios();
+                } else {
+                    const error = await response.json();
+                    alert(`创建失败: ${error.detail}`);
+                }
+            } catch (error) {
+                alert(`创建失败: ${error.message}`);
+            }
+        });
+
+        document.getElementById('addHoldingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (!currentPortfolioId) return;
+            
+            const formData = new FormData(e.target);
+            const data = {
+                ticker: formData.get('ticker').toUpperCase(),
+                shares: parseFloat(formData.get('shares')),
+                cost_per_share: parseFloat(formData.get('cost_per_share'))
+            };
+            
+            try {
+                const response = await fetch(`/portfolio/${currentPortfolioId}/holding`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    hideAddHoldingModal();
+                    viewPortfolioDetails(currentPortfolioId);
+                } else {
+                    const error = await response.json();
+                    alert(`添加失败: ${error.detail}`);
+                }
+            } catch (error) {
+                alert(`添加失败: ${error.message}`);
+            }
+        });
+
+        async function removeHolding(ticker) {
+            if (!currentPortfolioId) return;
+            
+            if (!confirm(`确定要移除 ${ticker} 的持仓吗？`)) return;
+            
+            try {
+                const response = await fetch(`/portfolio/${currentPortfolioId}/holding/${ticker}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    viewPortfolioDetails(currentPortfolioId);
+                } else {
+                    const error = await response.json();
+                    alert(`移除失败: ${error.detail}`);
+                }
+            } catch (error) {
+                alert(`移除失败: ${error.message}`);
+            }
+        }
+
+        document.getElementById('deletePortfolioBtn').addEventListener('click', async function() {
+            if (!currentPortfolioId) return;
+            
+            if (!confirm('确定要删除此投资组合吗？此操作不可撤销！')) return;
+            
+            try {
+                const response = await fetch(`/portfolio/${currentPortfolioId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    backToPortfolioList();
+                    loadPortfolios();
+                } else {
+                    const error = await response.json();
+                    alert(`删除失败: ${error.detail}`);
+                }
+            } catch (error) {
+                alert(`删除失败: ${error.message}`);
+            }
+        });
+
+        function backToPortfolioList() {
+            document.getElementById('portfolioDetails').classList.add('hidden');
+            document.querySelector('#portfolioTab .bg-white:first-child').classList.remove('hidden');
+            currentPortfolioId = null;
+        }
+
+        // Close modals when clicking outside
+        document.getElementById('createPortfolioModal').addEventListener('click', function(e) {
+            if (e.target === this) hideCreatePortfolioModal();
+        });
+
+        document.getElementById('addHoldingModal').addEventListener('click', function(e) {
+            if (e.target === this) hideAddHoldingModal();
+        });
+
+        // ==================== 新闻功能 ====================
+        
+        let currentNewsType = 'market';
+        let currentNewsTicker = null;
+        
+        async function loadNews(type = 'market', ticker = null) {
+            try {
+                document.getElementById('newsLoading').classList.remove('hidden');
+                document.getElementById('newsData').classList.add('hidden');
+                document.getElementById('newsError').classList.add('hidden');
+                
+                let url;
+                if (type === 'stock' && ticker) {
+                    url = `/stock-updates/${ticker}`;
+                } else {
+                    url = '/market-updates';
+                }
+                
+                const response = await fetch(url);
+                if (response.ok) {
+                    const newsData = await response.json();
+                    displayNews(newsData, type);
+                } else {
+                    throw new Error('无法获取新闻数据');
+                }
+            } catch (error) {
+                console.error('加载新闻失败:', error);
+                document.getElementById('newsError').classList.remove('hidden');
+            } finally {
+                document.getElementById('newsLoading').classList.add('hidden');
+                document.getElementById('newsData').classList.remove('hidden');
+            }
+        }
+        
+        function displayNews(newsData, type) {
+            if (!newsData || newsData.length === 0) {
+                document.getElementById('newsContent').innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-newspaper text-4xl mb-4"></i>
+                        <p>暂无新闻数据</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const newsHtml = newsData.map(news => {
+                const publishedDate = new Date(news.published_at).toLocaleString('zh-CN');
+                const sentimentBadge = news.sentiment ? getSentimentBadge(news.sentiment, news.sentiment_score) : '';
+                const tickerTags = news.tickers && news.tickers.length > 0 ? 
+                    `<div class="mt-2">
+                        ${news.tickers.slice(0, 3).map(ticker => 
+                            `<span class="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs mr-1">${ticker}</span>`
+                        ).join('')}
+                    </div>` : '';
+                
+                return `
+                    <div class="bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-semibold text-gray-900 leading-tight hover:text-blue-600 cursor-pointer"
+                                onclick="window.open('${news.url}', '_blank')">
+                                ${news.title}
+                            </h4>
+                            ${sentimentBadge}
+                        </div>
+                        
+                        ${news.summary ? `<p class="text-gray-600 text-sm mb-3 line-clamp-2">${news.summary}</p>` : ''}
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <div class="flex items-center space-x-3">
+                                <span class="flex items-center">
+                                    <i class="fas fa-globe mr-1"></i>
+                                    ${news.source}
+                                </span>
+                                <span class="flex items-center">
+                                    <i class="fas fa-clock mr-1"></i>
+                                    ${publishedDate}
+                                </span>
+                            </div>
+                            <a href="${news.url}" target="_blank" 
+                               class="text-blue-500 hover:text-blue-700 flex items-center">
+                                <i class="fas fa-external-link-alt mr-1"></i>
+                                阅读全文
+                            </a>
+                        </div>
+                        ${tickerTags}
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('newsContent').innerHTML = newsHtml;
+        }
+        
+        function getSentimentBadge(sentiment, score) {
+            let badgeClass, icon;
+            
+            switch(sentiment) {
+                case '积极':
+                    badgeClass = 'bg-green-100 text-green-800';
+                    icon = 'fas fa-smile';
+                    break;
+                case '消极':
+                    badgeClass = 'bg-red-100 text-red-800';
+                    icon = 'fas fa-frown';
+                    break;
+                default:
+                    badgeClass = 'bg-gray-100 text-gray-800';
+                    icon = 'fas fa-meh';
+            }
+            
+            return `
+                <span class="inline-flex items-center px-2 py-1 rounded text-xs ${badgeClass}">
+                    <i class="${icon} mr-1"></i>
+                    ${sentiment} ${score ? `(${(score * 100).toFixed(0)}%)` : ''}
+                </span>
+            `;
+        }
+        
+        // 新闻标签页切换
+        document.querySelectorAll('.news-tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const type = this.dataset.type;
+                
+                // 更新标签页样式
+                document.querySelectorAll('.news-tab-btn').forEach(b => {
+                    b.classList.remove('border-blue-500', 'text-blue-600');
+                    b.classList.add('text-gray-500', 'hover:text-gray-700');
+                });
+                this.classList.add('border-blue-500', 'text-blue-600');
+                this.classList.remove('text-gray-500', 'hover:text-gray-700');
+                
+                currentNewsType = type;
+                
+                if (type === 'market') {
+                    loadNews('market');
+                } else if (type === 'stock' && currentNewsTicker) {
+                    loadNews('stock', currentNewsTicker);
+                } else {
+                    // 如果没有选中股票，显示提示
+                    document.getElementById('newsContent').innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-info-circle text-4xl mb-4"></i>
+                            <p>请先搜索股票以查看相关新闻</p>
+                        </div>
+                    `;
+                }
+            });
+        });
+        
+        // 加载更多新闻
+        document.getElementById('loadMoreNews').addEventListener('click', function() {
+            if (currentNewsType === 'market') {
+                loadNews('market');
+            } else if (currentNewsType === 'stock' && currentNewsTicker) {
+                loadNews('stock', currentNewsTicker);
+            }
+        });
+        
+        // 当搜索股票时，更新新闻显示
+        function updateNewsForStock(ticker) {
+            currentNewsTicker = ticker;
+            if (currentNewsType === 'stock') {
+                loadNews('stock', ticker);
+            }
+        }
+
+        // ==================== 投资计算器功能 ====================
+        
+        // 复利计算器
+        function calculateCompound() {
+            const principal = parseFloat(document.getElementById('compoundPrincipal').value) || 0;
+            const rate = parseFloat(document.getElementById('compoundRate').value) / 100 || 0;
+            const years = parseInt(document.getElementById('compoundYears').value) || 0;
+            const monthly = parseFloat(document.getElementById('compoundMonthly').value) || 0;
+            
+            if (principal <= 0 || rate <= 0 || years <= 0) {
+                alert('请输入有效的数值');
+                return;
+            }
+            
+            // 计算复利
+            let futureValue = principal * Math.pow(1 + rate, years);
+            
+            // 计算定期投入的复利
+            if (monthly > 0) {
+                const monthlyRate = rate;
+                const monthlyContribution = monthly * ((Math.pow(1 + monthlyRate, years) - 1) / monthlyRate);
+                futureValue += monthlyContribution;
+            }
+            
+            const totalInvestment = principal + (monthly * years);
+            const totalReturn = futureValue - totalInvestment;
+            const annualizedReturn = ((futureValue / totalInvestment) ** (1/years) - 1) * 100;
+            
+            document.getElementById('compoundResult').classList.remove('hidden');
+            document.getElementById('compoundResultContent').innerHTML = `
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span>总投资:</span>
+                        <span class="font-bold">¥${totalInvestment.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>最终价值:</span>
+                        <span class="font-bold text-green-600">¥${futureValue.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>总收益:</span>
+                        <span class="font-bold text-green-600">¥${totalReturn.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>年化收益率:</span>
+                        <span class="font-bold">${annualizedReturn.toFixed(2)}%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>收益倍数:</span>
+                        <span class="font-bold">${(futureValue / totalInvestment).toFixed(2)}x</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 止损止盈计算器
+        function calculateStopLoss() {
+            const entryPrice = parseFloat(document.getElementById('entryPrice').value) || 0;
+            const stopLossPercent = parseFloat(document.getElementById('stopLossPercent').value) || 0;
+            const takeProfitPercent = parseFloat(document.getElementById('takeProfitPercent').value) || 0;
+            const investmentAmount = parseFloat(document.getElementById('investmentAmount').value) || 0;
+            
+            if (entryPrice <= 0 || stopLossPercent <= 0 || takeProfitPercent <= 0 || investmentAmount <= 0) {
+                alert('请输入有效的数值');
+                return;
+            }
+            
+            const stopLossPrice = entryPrice * (1 - stopLossPercent / 100);
+            const takeProfitPrice = entryPrice * (1 + takeProfitPercent / 100);
+            const shares = Math.floor(investmentAmount / entryPrice);
+            const actualInvestment = shares * entryPrice;
+            
+            const maxLoss = actualInvestment * (stopLossPercent / 100);
+            const maxProfit = actualInvestment * (takeProfitPercent / 100);
+            const riskRewardRatio = takeProfitPercent / stopLossPercent;
+            
+            document.getElementById('stopLossResult').classList.remove('hidden');
+            document.getElementById('stopLossResultContent').innerHTML = `
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span>买入价格:</span>
+                        <span class="font-bold">¥${entryPrice.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>止损价格:</span>
+                        <span class="font-bold text-red-600">¥${stopLossPrice.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>止盈价格:</span>
+                        <span class="font-bold text-green-600">¥${takeProfitPrice.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>可买股数:</span>
+                        <span class="font-bold">${shares}股</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>实际投资:</span>
+                        <span class="font-bold">¥${actualInvestment.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>最大亏损:</span>
+                        <span class="font-bold text-red-600">¥${maxLoss.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>最大盈利:</span>
+                        <span class="font-bold text-green-600">¥${maxProfit.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>风险收益比:</span>
+                        <span class="font-bold">1:${riskRewardRatio.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 仓位管理计算器
+        function calculatePosition() {
+            const totalCapital = parseFloat(document.getElementById('totalCapital').value) || 0;
+            const riskPercent = parseFloat(document.getElementById('riskPercent').value) || 0;
+            const entryPrice = parseFloat(document.getElementById('positionEntryPrice').value) || 0;
+            const stopPrice = parseFloat(document.getElementById('positionStopPrice').value) || 0;
+            
+            if (totalCapital <= 0 || riskPercent <= 0 || entryPrice <= 0 || stopPrice <= 0) {
+                alert('请输入有效的数值');
+                return;
+            }
+            
+            if (stopPrice >= entryPrice) {
+                alert('止损价格应该低于买入价格');
+                return;
+            }
+            
+            const riskAmount = totalCapital * (riskPercent / 100);
+            const priceRisk = entryPrice - stopPrice;
+            const shares = Math.floor(riskAmount / priceRisk);
+            const positionValue = shares * entryPrice;
+            const positionPercent = (positionValue / totalCapital) * 100;
+            
+            document.getElementById('positionResult').classList.remove('hidden');
+            document.getElementById('positionResultContent').innerHTML = `
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span>总资金:</span>
+                        <span class="font-bold">¥${totalCapital.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>风险金额:</span>
+                        <span class="font-bold text-red-600">¥${riskAmount.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>单股风险:</span>
+                        <span class="font-bold">¥${priceRisk.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>建议股数:</span>
+                        <span class="font-bold text-blue-600">${shares}股</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>仓位价值:</span>
+                        <span class="font-bold">¥${positionValue.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>仓位占比:</span>
+                        <span class="font-bold">${positionPercent.toFixed(2)}%</span>
+                    </div>
+                    <div class="mt-3 p-2 bg-yellow-100 rounded text-sm">
+                        <strong>建议:</strong> 根据${riskPercent}%的风险控制，建议买入${shares}股，占用资金${positionPercent.toFixed(1)}%
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 风险收益比计算器
+        function calculateRiskReward() {
+            const entryPrice = parseFloat(document.getElementById('rrEntryPrice').value) || 0;
+            const targetPrice = parseFloat(document.getElementById('rrTargetPrice').value) || 0;
+            const stopPrice = parseFloat(document.getElementById('rrStopPrice').value) || 0;
+            const winRate = parseFloat(document.getElementById('winRate').value) || 0;
+            
+            if (entryPrice <= 0 || targetPrice <= 0 || stopPrice <= 0 || winRate <= 0) {
+                alert('请输入有效的数值');
+                return;
+            }
+            
+            if (targetPrice <= entryPrice) {
+                alert('目标价格应该高于买入价格');
+                return;
+            }
+            
+            if (stopPrice >= entryPrice) {
+                alert('止损价格应该低于买入价格');
+                return;
+            }
+            
+            const reward = targetPrice - entryPrice;
+            const risk = entryPrice - stopPrice;
+            const riskRewardRatio = reward / risk;
+            const rewardPercent = (reward / entryPrice) * 100;
+            const riskPercent = (risk / entryPrice) * 100;
+            
+            // 计算期望收益
+            const expectedReturn = (winRate / 100) * rewardPercent - ((100 - winRate) / 100) * riskPercent;
+            
+            // 判断交易质量
+            let quality = '';
+            let qualityColor = '';
+            if (riskRewardRatio >= 3) {
+                quality = '优秀';
+                qualityColor = 'text-green-600';
+            } else if (riskRewardRatio >= 2) {
+                quality = '良好';
+                qualityColor = 'text-blue-600';
+            } else if (riskRewardRatio >= 1.5) {
+                quality = '一般';
+                qualityColor = 'text-yellow-600';
+            } else {
+                quality = '较差';
+                qualityColor = 'text-red-600';
+            }
+            
+            document.getElementById('riskRewardResult').classList.remove('hidden');
+            document.getElementById('riskRewardResultContent').innerHTML = `
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span>买入价格:</span>
+                        <span class="font-bold">¥${entryPrice.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>目标价格:</span>
+                        <span class="font-bold text-green-600">¥${targetPrice.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>止损价格:</span>
+                        <span class="font-bold text-red-600">¥${stopPrice.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>潜在收益:</span>
+                        <span class="font-bold text-green-600">+${rewardPercent.toFixed(2)}%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>潜在风险:</span>
+                        <span class="font-bold text-red-600">-${riskPercent.toFixed(2)}%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>风险收益比:</span>
+                        <span class="font-bold">1:${riskRewardRatio.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>期望收益:</span>
+                        <span class="font-bold ${expectedReturn >= 0 ? 'text-green-600' : 'text-red-600'}">${expectedReturn >= 0 ? '+' : ''}${expectedReturn.toFixed(2)}%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>交易质量:</span>
+                        <span class="font-bold ${qualityColor}">${quality}</span>
+                    </div>
+                    <div class="mt-3 p-2 bg-purple-100 rounded text-sm">
+                        <strong>建议:</strong> ${expectedReturn >= 0 ? '期望收益为正，' : '期望收益为负，'} 
+                        ${riskRewardRatio >= 2 ? '风险收益比合理，可考虑交易' : '风险收益比偏低，建议谨慎'}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ==================== 市场仪表板功能 ====================
+        
+        // 加载市场仪表板数据
+        async function loadMarketDashboard() {
+            try {
+                // 并行加载所有数据
+                const [dashboardResponse, movesResponse, sentimentResponse] = await Promise.all([
+                    fetch('/market-dashboard'),
+                    fetch('/market-movers'),
+                    fetch('/market-sentiment')
+                ]);
+                
+                if (dashboardResponse.ok && movesResponse.ok && sentimentResponse.ok) {
+                    const dashboardData = await dashboardResponse.json();
+                    const movesData = await movesResponse.json();
+                    const sentimentData = await sentimentResponse.json();
+                    
+                    if (dashboardData.success) {
+                        updateMarketIndices(dashboardData.data.market_indices);
+                        updateSectorHeatmap(dashboardData.data.sector_heatmap);
+                        updateMarketSentiment(dashboardData.data.market_sentiment);
+                    }
+                    
+                    if (movesData.success) {
+                        updateTopGainers(movesData.data.top_gainers);
+                        updateTopLosers(movesData.data.top_losers);
+                        updateVolumeLeaders(movesData.data.volume_leaders);
+                    }
+                    
+                    // 加载市场新闻
+                    loadDashboardNews();
+                }
+            } catch (error) {
+                console.error('加载市场仪表板数据失败:', error);
+            }
+        }
+        
+        // 更新市场指数
+        function updateMarketIndices(indices) {
+            // 更新S&P 500
+            if (indices.SPX) {
+                document.getElementById('spxPrice').textContent = indices.SPX.price.toFixed(2);
+                const changeElement = document.getElementById('spxChange');
+                const change = indices.SPX.change >= 0 ? `+${indices.SPX.change.toFixed(2)}` : indices.SPX.change.toFixed(2);
+                const changePercent = indices.SPX.change_percent >= 0 ? `+${indices.SPX.change_percent.toFixed(2)}%` : `${indices.SPX.change_percent.toFixed(2)}%`;
+                changeElement.textContent = `${change} (${changePercent})`;
+                changeElement.className = `text-sm ${indices.SPX.change >= 0 ? 'text-green-600' : 'text-red-600'}`;
+            }
+            
+            // 更新NASDAQ
+            if (indices.NASDAQ) {
+                document.getElementById('nasdaqPrice').textContent = indices.NASDAQ.price.toFixed(2);
+                const changeElement = document.getElementById('nasdaqChange');
+                const change = indices.NASDAQ.change >= 0 ? `+${indices.NASDAQ.change.toFixed(2)}` : indices.NASDAQ.change.toFixed(2);
+                const changePercent = indices.NASDAQ.change_percent >= 0 ? `+${indices.NASDAQ.change_percent.toFixed(2)}%` : `${indices.NASDAQ.change_percent.toFixed(2)}%`;
+                changeElement.textContent = `${change} (${changePercent})`;
+                changeElement.className = `text-sm ${indices.NASDAQ.change >= 0 ? 'text-green-600' : 'text-red-600'}`;
+            }
+            
+            // 更新DOW
+            if (indices.DOW) {
+                document.getElementById('dowPrice').textContent = indices.DOW.price.toFixed(2);
+                const changeElement = document.getElementById('dowChange');
+                const change = indices.DOW.change >= 0 ? `+${indices.DOW.change.toFixed(2)}` : indices.DOW.change.toFixed(2);
+                const changePercent = indices.DOW.change_percent >= 0 ? `+${indices.DOW.change_percent.toFixed(2)}%` : `${indices.DOW.change_percent.toFixed(2)}%`;
+                changeElement.textContent = `${change} (${changePercent})`;
+                changeElement.className = `text-sm ${indices.DOW.change >= 0 ? 'text-green-600' : 'text-red-600'}`;
+            }
+        }
+        
+        // 更新行业热力图
+        function updateSectorHeatmap(sectors) {
+            const heatmapContainer = document.getElementById('sectorHeatmap');
+            
+            heatmapContainer.innerHTML = sectors.map(sector => {
+                const changePercent = sector.change_percent;
+                let colorClass = 'bg-gray-100 text-gray-800';
+                
+                if (changePercent > 1) {
+                    colorClass = 'bg-green-500 text-white';
+                } else if (changePercent > 0.3) {
+                    colorClass = 'bg-green-300 text-green-900';
+                } else if (changePercent > -0.3) {
+                    colorClass = 'bg-gray-200 text-gray-700';
+                } else if (changePercent > -1) {
+                    colorClass = 'bg-red-300 text-red-900';
+                } else {
+                    colorClass = 'bg-red-500 text-white';
+                }
+                
+                return `
+                    <div class="p-3 rounded ${colorClass} text-center">
+                        <div class="font-medium text-sm">${sector.name}</div>
+                        <div class="text-xs mt-1">${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // 更新市场情绪
+        function updateMarketSentiment(sentiment) {
+            // 更新恐惧贪婪指数
+            const fearGreedBar = document.getElementById('fearGreedBar');
+            const fearGreedValue = document.getElementById('fearGreedValue');
+            
+            fearGreedBar.style.width = `${sentiment.fear_greed_index}%`;
+            fearGreedValue.textContent = `${sentiment.fear_greed_index} (${sentiment.fear_greed_label})`;
+            
+            // 根据指数设置颜色
+            if (sentiment.fear_greed_index >= 60) {
+                fearGreedBar.className = 'bg-green-500 h-2 rounded-full';
+            } else if (sentiment.fear_greed_index >= 40) {
+                fearGreedBar.className = 'bg-yellow-500 h-2 rounded-full';
+            } else {
+                fearGreedBar.className = 'bg-red-500 h-2 rounded-full';
+            }
+            
+            // 更新其他指标
+            document.getElementById('vixValue').textContent = sentiment.vix_value;
+            document.getElementById('advanceDecline').textContent = `${sentiment.advance_decline_ratio}%`;
+            document.getElementById('highLowRatio').textContent = sentiment.high_low_ratio;
+        }
+        
+        // 更新涨幅榜
+        function updateTopGainers(gainers) {
+            const container = document.getElementById('topGainers');
+            
+            container.innerHTML = gainers.map(stock => `
+                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div>
+                        <div class="font-medium">${stock.symbol}</div>
+                        <div class="text-sm text-gray-600">${stock.name}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-medium">$${stock.price.toFixed(2)}</div>
+                        <div class="text-sm text-green-600">+${stock.change_percent.toFixed(2)}%</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // 更新跌幅榜
+        function updateTopLosers(losers) {
+            const container = document.getElementById('topLosers');
+            
+            container.innerHTML = losers.map(stock => `
+                <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                    <div>
+                        <div class="font-medium">${stock.symbol}</div>
+                        <div class="text-sm text-gray-600">${stock.name}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-medium">$${stock.price.toFixed(2)}</div>
+                        <div class="text-sm text-red-600">${stock.change_percent.toFixed(2)}%</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // 更新成交量排行
+        function updateVolumeLeaders(leaders) {
+            const container = document.getElementById('volumeLeaders');
+            
+            container.innerHTML = leaders.map(stock => `
+                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div>
+                        <div class="font-medium">${stock.symbol}</div>
+                        <div class="text-sm text-gray-600">${stock.name}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-medium">$${stock.price.toFixed(2)}</div>
+                        <div class="text-sm text-blue-600">${(stock.volume / 1000000).toFixed(1)}M</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // 加载仪表板新闻
+        async function loadDashboardNews() {
+            try {
+                const response = await fetch('/market-updates?limit=5');
+                if (response.ok) {
+                    const data = await response.json();
+                    // 直接使用返回的数组，不需要 .news 字段
+                    updateDashboardNews(Array.isArray(data) ? data : []);
+                }
+            } catch (error) {
+                console.error('加载市场新闻失败:', error);
+                // 显示备用消息
+                updateDashboardNews([]);
+            }
+        }
+        
+        // 更新仪表板新闻
+        function updateDashboardNews(news) {
+            const container = document.getElementById('dashboardNews');
+            
+            if (news.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-4">暂无市场新闻</div>';
+                return;
+            }
+            
+            container.innerHTML = news.map(item => `
+                <div class="border-b border-gray-200 pb-3 last:border-b-0">
+                    <a href="${item.url}" target="_blank" class="block hover:text-blue-600">
+                        <div class="font-medium text-sm line-clamp-2 mb-1">${item.title}</div>
+                        <div class="text-xs text-gray-500 flex items-center">
+                            <span>${item.source}</span>
+                            <span class="mx-2">•</span>
+                            <span>${formatNewsTime(item.published_at)}</span>
+                        </div>
+                    </a>
+                </div>
+            `).join('');
+        }
+        
+        // 格式化新闻时间
+        function formatNewsTime(timeString) {
+            try {
+                const date = new Date(timeString);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                
+                if (diffHours < 1) {
+                    return '刚刚';
+                } else if (diffHours < 24) {
+                    return `${diffHours}小时前`;
+                } else {
+                    return `${Math.floor(diffHours / 24)}天前`;
+                }
+            } catch (error) {
+                return '未知时间';
+            }
+        }
+        
+        // 启动实时更新
+        function startDashboardUpdates() {
+            // 每60秒更新一次数据
+            setInterval(loadMarketDashboard, 60000);
+        }
+        
+        // ==================== 主搜索功能 ====================
+        
+        // 智能股票分析
+        async function performIntelligentAnalysis(ticker) {
+            const loadingElement = document.getElementById('mainSearchLoading');
+            
+            try {
+                // 显示加载状态
+                loadingElement.classList.remove('hidden');
+                
+                // 重置所有标签页到空状态
+                resetAllTabsToEmpty();
+                
+                // 并行执行所有分析
+                const analysisPromises = [
+                    fetch(`/stock/${ticker.toUpperCase()}`),  // 基础股票数据
+                    fetch(`/fundamental/${ticker.toUpperCase()}`),  // 基本面分析
+                    fetch(`/risk/${ticker.toUpperCase()}`),  // 风险分析
+                    fetch(`/stock-updates/${ticker.toUpperCase()}?limit=5`)  // 股票相关新闻
+                ];
+                
+                // 等待所有请求完成
+                const responses = await Promise.allSettled(analysisPromises);
+                
+                // 处理结果
+                const stockData = responses[0].status === 'fulfilled' && responses[0].value.ok ? 
+                    await responses[0].value.json() : null;
+                const fundamentalData = responses[1].status === 'fulfilled' && responses[1].value.ok ? 
+                    await responses[1].value.json() : null;
+                const riskData = responses[2].status === 'fulfilled' && responses[2].value.ok ? 
+                    await responses[2].value.json() : null;
+                const newsData = responses[3].status === 'fulfilled' && responses[3].value.ok ? 
+                    await responses[3].value.json() : null;
+                
+                // 显示分析结果
+                displayIntelligentAnalysisResults(ticker, stockData, fundamentalData, riskData, newsData);
+                
+            } catch (error) {
+                console.error('智能分析失败:', error);
+                alert(`分析失败: ${error.message}`);
+            } finally {
+                loadingElement.classList.add('hidden');
+            }
+        }
+        
+        // 显示智能分析结果
+        function displayIntelligentAnalysisResults(ticker, stockData, fundamentalData, riskData, newsData) {
+            // 如果股票数据存在，更新股票分析标签页
+            if (stockData) {
+                document.getElementById('ticker').value = ticker;
+                displayStockResult(stockData);
+                
+                // 更新价格走势图
+                if (stockData.chart_data) {
+                    updateCharts(stockData.chart_data, 'line');
+                }
+            }
+            
+            // 如果基本面数据存在，更新基本面分析标签页
+            if (fundamentalData) {
+                displayFundamentalAnalysis(fundamentalData);
+            }
+            
+            // 如果风险数据存在，更新风险管理标签页
+            if (riskData) {
+                displayRiskAnalysis(riskData);
+            }
+            
+            // 显示成功消息和建议
+            showAnalysisCompletedMessage(ticker, stockData, fundamentalData, riskData);
+        }
+        
+        // 显示分析完成消息
+        function showAnalysisCompletedMessage(ticker, stockData, fundamentalData, riskData) {
+            const analysisMessage = document.createElement('div');
+            analysisMessage.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
+            analysisMessage.innerHTML = `
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                    <span class="font-semibold text-green-800">${ticker.toUpperCase()} 智能分析完成！</span>
+                </div>
+                <div class="text-sm text-green-700">
+                    已为您准备了完整的投资分析报告，请查看各个标签页：
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        ${stockData ? '<button onclick="showTab(\'stock\')" class="px-2 py-1 bg-green-100 hover:bg-green-200 rounded text-xs cursor-pointer">✓ 股票分析</button>' : ''}
+                        ${fundamentalData ? '<button onclick="showTab(\'fundamental\')" class="px-2 py-1 bg-green-100 hover:bg-green-200 rounded text-xs cursor-pointer">✓ 基本面分析</button>' : ''}
+                        ${riskData ? '<button onclick="showTab(\'risk\')" class="px-2 py-1 bg-green-100 hover:bg-green-200 rounded text-xs cursor-pointer">✓ 风险管理</button>' : ''}
+                    </div>
+                    <div class="mt-3 text-xs text-green-600">
+                        💡 提示：点击上方标签可直接跳转到对应分析报告
+                    </div>
+                </div>
+            `;
+            
+            // 删除之前的消息
+            const existingMessage = document.querySelector('.analysis-completed-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+            
+            // 添加新消息
+            analysisMessage.classList.add('analysis-completed-message');
+            document.getElementById('mainSearchLoading').parentNode.appendChild(analysisMessage);
+            
+            // 5秒后自动移除消息
+            setTimeout(() => {
+                if (analysisMessage.parentNode) {
+                    analysisMessage.remove();
+                }
+            }, 5000);
+        }
+        
+        // 显示股票分析结果
+        function displayStockResult(data) {
+            // 显示股票分析结果，隐藏空状态
+            document.getElementById('stockAnalysisResults').classList.remove('hidden');
+            document.getElementById('stockAnalysisEmpty').classList.add('hidden');
+            
+            // 更新股票信息
+            document.getElementById('tickerLabel').textContent = data.symbol;
+            document.getElementById('companyNameLabel').textContent = data.company_name || '';
+            document.getElementById('priceInfo').textContent = `$${data.current_price} | 24H: ${data.price_change >= 0 ? '+' : ''}${data.price_change_percent}%`;
+            
+            // 更新决策徽章
+            const badge = document.getElementById('badge');
+            if (data.recommendation === 'BUY') {
+                badge.textContent = '买入';
+                badge.className = 'px-4 py-2 rounded-lg text-white text-lg font-bold bg-green-600';
+            } else if (data.recommendation === 'SELL') {
+                badge.textContent = '卖出';
+                badge.className = 'px-4 py-2 rounded-lg text-white text-lg font-bold bg-red-600';
+            } else {
+                badge.textContent = '持有';
+                badge.className = 'px-4 py-2 rounded-lg text-white text-lg font-bold bg-yellow-600';
+            }
+            
+            // 更新分析原因
+            const reasonsList = document.getElementById('reasonsList');
+            if (data.reasons && Array.isArray(data.reasons)) {
+                reasonsList.innerHTML = data.reasons.map(reason => 
+                    `<li class="text-blue-700"><i class="fas fa-check-circle mr-2"></i>${reason}</li>`
+                ).join('');
+            }
+        }
+        
+        // 显示基本面分析结果
+        function displayFundamentalAnalysis(data) {
+            // 显示基本面分析结果，隐藏空状态
+            document.getElementById('fundamentalAnalysisResults').classList.remove('hidden');
+            document.getElementById('fundamentalAnalysisEmpty').classList.add('hidden');
+            
+            // 更新基本面数据显示
+            if (data.financial_metrics) {
+                const metrics = data.financial_metrics;
+                const metricsHtml = `
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="text-center p-3 bg-blue-50 rounded">
+                            <div class="text-2xl font-bold text-blue-600">${metrics.pe_ratio || 'N/A'}</div>
+                            <div class="text-sm text-gray-600">市盈率</div>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded">
+                            <div class="text-2xl font-bold text-green-600">${metrics.pb_ratio || 'N/A'}</div>
+                            <div class="text-sm text-gray-600">市净率</div>
+                        </div>
+                        <div class="text-center p-3 bg-purple-50 rounded">
+                            <div class="text-2xl font-bold text-purple-600">${metrics.roe || 'N/A'}%</div>
+                            <div class="text-sm text-gray-600">净资产收益率</div>
+                        </div>
+                        <div class="text-center p-3 bg-orange-50 rounded">
+                            <div class="text-2xl font-bold text-orange-600">${metrics.debt_to_equity || 'N/A'}</div>
+                            <div class="text-sm text-gray-600">负债权益比</div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('fundamentalMetrics').innerHTML = metricsHtml;
+            }
+        }
+        
+        // 显示风险分析结果
+        function displayRiskAnalysis(data) {
+            // 显示风险分析结果，隐藏空状态
+            document.getElementById('riskAnalysisResults').classList.remove('hidden');
+            document.getElementById('riskAnalysisEmpty').classList.add('hidden');
+            
+            // 更新风险分析数据显示
+            if (data.risk_summary) {
+                const summary = data.risk_summary;
+                const riskHtml = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-red-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-red-800 mb-2">风险等级</h4>
+                            <div class="text-2xl font-bold text-red-600">${summary.risk_level || '中等'}</div>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-blue-800 mb-2">建议仓位</h4>
+                            <div class="text-2xl font-bold text-blue-600">${summary.recommended_position || '5-10%'}</div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('riskSummary').innerHTML = riskHtml;
+            }
+        }
+        
+        // 焦点到主搜索框
+        function focusMainSearch() {
+            document.getElementById('mainTicker').focus();
+            document.getElementById('mainTicker').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // 重置所有标签页到空状态
+        function resetAllTabsToEmpty() {
+            // 隐藏所有结果，显示空状态
+            document.getElementById('stockAnalysisResults').classList.add('hidden');
+            document.getElementById('stockAnalysisEmpty').classList.remove('hidden');
+            
+            document.getElementById('fundamentalAnalysisResults').classList.add('hidden');
+            document.getElementById('fundamentalAnalysisEmpty').classList.remove('hidden');
+            
+            document.getElementById('riskAnalysisResults').classList.add('hidden');
+            document.getElementById('riskAnalysisEmpty').classList.remove('hidden');
+        }
+        
+        // 标签页切换函数
+        function showTab(tabName) {
+            // 映射标签名称到对应的ID
+            const tabMapping = {
+                'dashboard': 'Dashboard',
+                'stock': 'Stock', 
+                'fundamental': 'Fundamental',
+                'risk': 'Risk',
+                'portfolio': 'Portfolio',
+                'tools': 'Tools'
+            };
+            
+            // 获取对应的标签名称
+            const mappedTabName = tabMapping[tabName.toLowerCase()];
+            if (!mappedTabName) {
+                console.error('Unknown tab name:', tabName);
+                return;
+            }
+            
+            // 移除所有标签按钮的活动状态
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('tab-active', 'text-blue-600');
+                btn.classList.add('text-gray-600');
+            });
+            
+            // 隐藏所有标签内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // 激活对应的标签按钮
+            const tabButton = document.getElementById('tab' + mappedTabName);
+            if (tabButton) {
+                tabButton.classList.add('tab-active', 'text-blue-600');
+                tabButton.classList.remove('text-gray-600');
+            }
+            
+            // 显示对应的标签内容
+            const tabContent = document.getElementById(tabName.toLowerCase() + 'Tab');
+            if (tabContent) {
+                tabContent.classList.remove('hidden');
+            }
+        }
+        
+        // ==================== 股票筛选器功能 ====================
+        
+        // 股票筛选功能
+        async function screenStocks() {
+            const loadingElement = document.getElementById('screenerLoading');
+            const resultsElement = document.getElementById('screenerResults');
+            const emptyElement = document.getElementById('screenerEmpty');
+            
+            // 显示加载状态
+            loadingElement.classList.remove('hidden');
+            resultsElement.classList.add('hidden');
+            emptyElement.classList.add('hidden');
+            
+            try {
+                // 获取筛选条件
+                const filters = {
+                    market_cap: document.getElementById('marketCap').value,
+                    pe_ratio: document.getElementById('peRatio').value,
+                    price_change: document.getElementById('priceChange').value,
+                    volume: document.getElementById('volume').value,
+                    sector: document.getElementById('sector').value,
+                    sort_by: document.getElementById('sortBy').value
+                };
+                
+                // 移除空值
+                Object.keys(filters).forEach(key => {
+                    if (!filters[key]) {
+                        delete filters[key];
+                    }
+                });
+                
+                // 调用API
+                const response = await fetch('/stock-screener', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(filters)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('筛选失败');
+                }
+                
+                const data = await response.json();
+                displayScreenerResults(data);
+                
+            } catch (error) {
+                console.error('股票筛选失败:', error);
+                alert('股票筛选失败，请重试');
+                emptyElement.classList.remove('hidden');
+            } finally {
+                loadingElement.classList.add('hidden');
+            }
+        }
+        
+        // 显示筛选结果
+        function displayScreenerResults(results) {
+            const resultsElement = document.getElementById('screenerResults');
+            const emptyElement = document.getElementById('screenerEmpty');
+            const tableBody = document.getElementById('resultsTableBody');
+            const countElement = document.getElementById('resultCount');
+            
+            if (results.length === 0) {
+                resultsElement.classList.add('hidden');
+                emptyElement.classList.remove('hidden');
+                return;
+            }
+            
+            // 更新结果计数
+            countElement.textContent = results.length;
+            
+            // 生成表格内容
+            tableBody.innerHTML = results.map(stock => `
+                <tr class="hover:bg-gray-50">
+                    <td class="border border-gray-200 px-4 py-2 font-medium">${stock.symbol}</td>
+                    <td class="border border-gray-200 px-4 py-2">${stock.name}</td>
+                    <td class="border border-gray-200 px-4 py-2 text-right font-medium">$${stock.price.toFixed(2)}</td>
+                    <td class="border border-gray-200 px-4 py-2 text-right ${stock.change_percent >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        ${stock.change_percent >= 0 ? '+' : ''}${stock.change_percent.toFixed(2)}%
+                    </td>
+                    <td class="border border-gray-200 px-4 py-2 text-right">${formatMarketCap(stock.market_cap)}</td>
+                    <td class="border border-gray-200 px-4 py-2 text-right">${stock.pe_ratio.toFixed(1)}</td>
+                    <td class="border border-gray-200 px-4 py-2">${getSectorName(stock.sector)}</td>
+                    <td class="border border-gray-200 px-4 py-2 text-center">
+                        <button onclick="analyzeStock('${stock.symbol}')" 
+                                class="text-blue-600 hover:text-blue-800 text-sm mr-2">
+                            <i class="fas fa-chart-line"></i>
+                        </button>
+                        <button onclick="addToWatchlist('${stock.symbol}')" 
+                                class="text-green-600 hover:text-green-800 text-sm">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            // 显示结果
+            emptyElement.classList.add('hidden');
+            resultsElement.classList.remove('hidden');
+        }
+        
+        // 重置筛选器
+        function resetScreener() {
+            document.getElementById('marketCap').value = '';
+            document.getElementById('peRatio').value = '';
+            document.getElementById('priceChange').value = '';
+            document.getElementById('volume').value = '';
+            document.getElementById('sector').value = '';
+            document.getElementById('sortBy').value = 'marketCap';
+            
+            // 隐藏结果，显示空状态
+            document.getElementById('screenerResults').classList.add('hidden');
+            document.getElementById('screenerLoading').classList.add('hidden');
+            document.getElementById('screenerEmpty').classList.remove('hidden');
+        }
+        
+        // 导出结果
+        function exportResults() {
+            const tableBody = document.getElementById('resultsTableBody');
+            const rows = tableBody.querySelectorAll('tr');
+            
+            if (rows.length === 0) {
+                alert('暂无数据可导出');
+                return;
+            }
+            
+            // 准备CSV数据
+            const csvData = [];
+            csvData.push(['股票代码', '公司名称', '当前价格', '涨跌幅', '市值', '市盈率', '行业']);
+            
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const rowData = [
+                    cells[0].textContent.trim(),
+                    cells[1].textContent.trim(),
+                    cells[2].textContent.trim(),
+                    cells[3].textContent.trim(),
+                    cells[4].textContent.trim(),
+                    cells[5].textContent.trim(),
+                    cells[6].textContent.trim()
+                ];
+                csvData.push(rowData);
+            });
+            
+            // 转换为CSV格式
+            const csvContent = csvData.map(row => 
+                row.map(cell => `"${cell}"`).join(',')
+            ).join('\n');
+            
+            // 创建并下载文件
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `stock_screener_results_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // 辅助函数：格式化市值
+        function formatMarketCap(marketCap) {
+            if (marketCap >= 1000000000000) {
+                return (marketCap / 1000000000000).toFixed(1) + 'T';
+            } else if (marketCap >= 1000000000) {
+                return (marketCap / 1000000000).toFixed(1) + 'B';
+            } else if (marketCap >= 1000000) {
+                return (marketCap / 1000000).toFixed(1) + 'M';
+            } else {
+                return marketCap.toLocaleString();
+            }
+        }
+        
+        // 辅助函数：获取行业中文名
+        function getSectorName(sector) {
+            const sectorMap = {
+                'technology': '科技',
+                'healthcare': '医疗',
+                'financial': '金融',
+                'consumer': '消费',
+                'energy': '能源',
+                'industrial': '工业',
+                'utilities': '公用事业',
+                'materials': '材料',
+                'real_estate': '房地产',
+                'communication': '通信'
+            };
+            return sectorMap[sector] || sector;
+        }
+        
+        // 分析股票（调用现有的股票分析功能）
+        async function analyzeStock(symbol) {
+            // 切换到股票分析标签
+            showTab('stock');
+            
+            // 填入股票代码并执行分析
+            document.getElementById('ticker').value = symbol;
+            searchStock();
+        }
+        
+        // 添加到关注列表
+        async function addToWatchlist(symbol) {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                alert('请先登录');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/auth/watchlist', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        name: `关注 ${symbol}`
+                    })
+                });
+                
+                if (response.ok) {
+                    alert(`${symbol} 已添加到关注列表`);
+                } else {
+                    const error = await response.json();
+                    alert(`添加失败: ${error.detail || '未知错误'}`);
+                }
+            } catch (error) {
+                console.error('添加关注失败:', error);
+                alert('添加关注失败，请重试');
+            }
         }
     </script>
 </body>

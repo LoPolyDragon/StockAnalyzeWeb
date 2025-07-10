@@ -241,6 +241,42 @@ class PortfolioService:
             print(f"Error calculating portfolio performance: {e}")
             return None
     
+    def delete_portfolio(self, portfolio_id: str) -> bool:
+        """删除投资组合"""
+        if portfolio_id not in self.portfolios:
+            return False
+        
+        del self.portfolios[portfolio_id]
+        self._save_portfolios()
+        return True
+    
+    def remove_holding(self, portfolio_id: str, ticker: str) -> bool:
+        """移除股票持仓"""
+        if portfolio_id not in self.portfolios:
+            return False
+        
+        portfolio = self.portfolios[portfolio_id]
+        if ticker not in portfolio["holdings"]:
+            return False
+        
+        del portfolio["holdings"][ticker]
+        portfolio["updated_at"] = datetime.now(timezone.utc).isoformat()
+        self._save_portfolios()
+        return True
+    
+    def update_portfolio(self, portfolio_id: str, name: str, description: Optional[str] = None) -> bool:
+        """更新投资组合信息"""
+        if portfolio_id not in self.portfolios:
+            return False
+        
+        portfolio = self.portfolios[portfolio_id]
+        portfolio["name"] = name
+        if description is not None:
+            portfolio["description"] = description
+        portfolio["updated_at"] = datetime.now(timezone.utc).isoformat()
+        self._save_portfolios()
+        return True
+    
     def _calculate_daily_portfolio_values(self, portfolio: Dict, period: str = "1y") -> List[Dict]:
         """计算投资组合的每日价值"""
         holdings = portfolio["holdings"]

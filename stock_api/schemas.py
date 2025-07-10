@@ -5,6 +5,7 @@ from datetime import datetime
 
 class StockResponse(BaseModel):
     ticker: str
+    company_name: str = ""  # 股票名称
     current_price: float
     open: float
     high: float
@@ -12,7 +13,7 @@ class StockResponse(BaseModel):
     volume: int
     decision: str
     reasons: list[str]
-    history: list[dict]  # 每日 {date, close} 列表
+    history: list[dict]  # 每日 {date, open, high, low, close, volume} 列表
 
 
 # 投资组合相关数据模型
@@ -286,3 +287,208 @@ class RiskManagementSummary(BaseModel):
     risk_score: float        # 0-100分
     key_risks: List[str]
     risk_mitigation_suggestions: List[str]
+
+
+# 自动化投资组合相关数据模型
+class TradingApiConfig(BaseModel):
+    """交易API配置"""
+    api_provider: str  # "alpaca", "interactive_brokers", "td_ameritrade", "schwab", "paper_trading"
+    api_key: str
+    api_secret: str
+    base_url: Optional[str] = None
+    is_sandbox: bool = True  # 是否为沙盒环境
+    account_id: Optional[str] = None
+    last_sync: Optional[datetime] = None
+    is_active: bool = True
+
+class AITradingStrategy(BaseModel):
+    """AI交易策略配置"""
+    strategy_name: str
+    max_position_size: float  # 单个股票最大仓位占比 (%)
+    max_daily_trades: int = 5  # 每日最大交易次数
+    risk_tolerance: str  # "conservative", "moderate", "aggressive"
+    
+    # 选股条件
+    min_market_cap: Optional[float] = None  # 最小市值
+    max_pe_ratio: Optional[float] = None    # 最大PE比率
+    min_volume: Optional[float] = None      # 最小成交量
+    excluded_sectors: List[str] = []        # 排除的行业
+    
+    # 交易规则
+    stop_loss_pct: float = 10.0         # 止损比例
+    take_profit_pct: float = 20.0       # 止盈比例
+    rebalance_frequency: str = "daily"   # 重新平衡频率: "daily", "weekly", "monthly"
+    
+    # AI参数
+    confidence_threshold: float = 0.7    # AI决策置信度阈值
+    max_stocks_to_analyze: int = 100     # 最大分析股票数量
+    enable_sector_diversification: bool = True
+    enable_risk_management: bool = True
+
+class AutomatedPortfolio(BaseModel):
+    """自动化投资组合"""
+    id: str
+    name: str
+    description: Optional[str] = None
+    
+    # 模式控制
+    mode: str  # "manual", "auto", "hybrid"
+    is_active: bool = True
+    
+    # 资金管理
+    total_budget: float           # 总预算 (USD)
+    available_cash: float         # 可用现金
+    reserved_cash: float = 0      # 预留现金
+    max_single_position: float    # 单个股票最大投资额
+    
+    # 交易API配置
+    trading_api: Optional[TradingApiConfig] = None
+    
+    # AI策略配置
+    ai_strategy: Optional[AITradingStrategy] = None
+    
+    # 传统持仓信息
+    holdings: List[PortfolioHolding] = []
+    
+    # 自动化相关
+    ai_recommendations: List[Dict] = []    # AI推荐的股票列表
+    pending_orders: List[Dict] = []        # 待执行订单
+    order_history: List[Dict] = []         # 历史订单
+    
+    # 时间戳
+    created_at: datetime
+    updated_at: datetime
+    last_ai_analysis: Optional[datetime] = None
+    last_trade_execution: Optional[datetime] = None
+
+class AIStockRecommendation(BaseModel):
+    """AI股票推荐"""
+    ticker: str
+    company_name: str
+    recommendation: str  # "BUY", "SELL", "HOLD"
+    confidence_score: float  # 0-1
+    target_price: Optional[float] = None
+    
+    # 推荐理由
+    technical_score: float      # 技术面评分
+    fundamental_score: float    # 基本面评分
+    sentiment_score: float      # 市场情绪评分
+    final_score: float          # 综合评分
+    
+    # 详细分析
+    reasons: List[str]
+    risk_factors: List[str]
+    
+    # 建议仓位
+    suggested_position_size: float  # 建议投资金额
+    suggested_weight: float         # 建议权重
+    
+    # 时间信息
+    analysis_date: datetime
+    valid_until: Optional[datetime] = None
+
+class TradingOrder(BaseModel):
+    """交易订单"""
+    id: str
+    portfolio_id: str
+    order_type: str  # "market", "limit", "stop", "stop_limit"
+    side: str        # "buy", "sell"
+    ticker: str
+    quantity: float
+    price: Optional[float] = None
+    stop_price: Optional[float] = None
+    
+    # 订单状态
+    status: str  # "pending", "filled", "cancelled", "rejected", "partial"
+    filled_quantity: float = 0
+    filled_price: Optional[float] = None
+    
+    # 执行信息
+    broker_order_id: Optional[str] = None
+    execution_source: str  # "manual", "ai_auto", "rebalance"
+    
+    # 时间戳
+    created_at: datetime
+    updated_at: datetime
+    filled_at: Optional[datetime] = None
+
+class PortfolioPerformanceMetrics(BaseModel):
+    """投资组合业绩指标"""
+    portfolio_id: str
+    date: datetime
+    
+    # 基本指标
+    total_value: float
+    total_pnl: float
+    total_pnl_pct: float
+    available_cash: float
+    
+    # 比较基准
+    benchmark_return: Optional[float] = None  # 基准收益率
+    alpha: Optional[float] = None             # 超额收益
+    beta: Optional[float] = None              # 系统风险系数
+    
+    # 风险指标
+    sharpe_ratio: Optional[float] = None
+    sortino_ratio: Optional[float] = None
+    max_drawdown: Optional[float] = None
+    volatility: Optional[float] = None
+    
+    # AI相关指标
+    ai_decision_accuracy: Optional[float] = None  # AI决策准确率
+    ai_trade_count: int = 0                       # AI交易次数
+    manual_trade_count: int = 0                   # 手动交易次数
+    
+    # 成本分析
+    total_fees: float = 0                         # 总交易费用
+    average_holding_period: Optional[int] = None  # 平均持仓天数
+
+class AutomatedPortfolioCreate(BaseModel):
+    """创建自动化投资组合请求"""
+    name: str
+    description: Optional[str] = None
+    mode: str = "manual"  # "manual", "auto", "hybrid"
+    total_budget: float
+    max_single_position: float
+    trading_api: Optional[TradingApiConfig] = None
+    ai_strategy: Optional[AITradingStrategy] = None
+
+class AutomatedPortfolioUpdate(BaseModel):
+    """更新自动化投资组合请求"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    mode: Optional[str] = None
+    total_budget: Optional[float] = None
+    max_single_position: Optional[float] = None
+    is_active: Optional[bool] = None
+    trading_api: Optional[TradingApiConfig] = None
+    ai_strategy: Optional[AITradingStrategy] = None
+
+class AIAnalysisRequest(BaseModel):
+    """AI分析请求"""
+    portfolio_id: str
+    max_recommendations: int = 10
+    force_refresh: bool = False
+    target_sectors: List[str] = []  # 目标行业
+    exclude_current_holdings: bool = False
+
+class AIAnalysisResponse(BaseModel):
+    """AI分析响应"""
+    portfolio_id: str
+    analysis_date: datetime
+    recommendations: List[AIStockRecommendation]
+    market_sentiment: str  # "bullish", "bearish", "neutral"
+    suggested_actions: List[str]
+    risk_warnings: List[str]
+    next_analysis_date: Optional[datetime] = None
+
+class AutoTradingStatus(BaseModel):
+    """自动交易状态"""
+    portfolio_id: str
+    is_enabled: bool
+    last_execution: Optional[datetime] = None
+    next_execution: Optional[datetime] = None
+    pending_orders_count: int
+    daily_trades_count: int
+    daily_trades_limit: int
+    error_messages: List[str] = []
