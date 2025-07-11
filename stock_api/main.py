@@ -37,6 +37,15 @@ except Exception as e:
     HAS_NEWS_SERVICE = False
     logger.error(f"新闻服务加载失败: {e}")
 
+# 导入翻译服务
+try:
+    from .translation_service import translation_service
+    HAS_TRANSLATION_SERVICE = True
+    logger.info("翻译服务加载成功")
+except Exception as e:
+    HAS_TRANSLATION_SERVICE = False
+    logger.error(f"翻译服务加载失败: {e}")
+
 app = FastAPI(
     title="Stock AI Advisor API", 
     version="2.0.0",
@@ -1136,6 +1145,103 @@ def get_market_sentiment():
             'error': str(e),
             'data': {}
         }
+
+# ==================== 设置和翻译API ====================
+
+@app.get("/api/translations/{lang}")
+def get_translations(lang: str):
+    """获取界面文本翻译"""
+    if HAS_TRANSLATION_SERVICE:
+        try:
+            return {
+                'success': True,
+                'data': translation_service.get_all_ui_texts(lang)
+            }
+        except Exception as e:
+            logger.error(f"获取翻译失败: {e}")
+    
+    return {
+        'success': False,
+        'data': {}
+    }
+
+@app.get("/api/settings")
+def get_settings():
+    """获取用户设置"""
+    # 简单返回默认设置，实际项目中应该从数据库读取
+    return {
+        'language': 'zh',
+        'auto_translate_news': True,
+        'theme': 'light'
+    }
+
+@app.post("/api/settings")
+def save_settings(settings: Dict):
+    """保存用户设置"""
+    # 简单返回成功，实际项目中应该保存到数据库
+    logger.info(f"保存设置: {settings}")
+    return {
+        'success': True,
+        'message': 'Settings saved successfully'
+    }
+
+@app.get("/api/news/translated")
+def get_translated_market_news(lang: str = Query('zh', description="语言"), limit: int = Query(20, description="新闻数量限制")):
+    """获取翻译后的市场新闻"""
+    if HAS_NEWS_SERVICE:
+        try:
+            news = real_news_service.get_market_news(limit)
+            
+            # 如果需要翻译且翻译服务可用
+            if lang == 'zh' and HAS_TRANSLATION_SERVICE:
+                news = translation_service.translate_news_list(news, lang)
+            
+            logger.info(f"成功获取翻译后的市场新闻 {len(news)} 条")
+            return news
+        except Exception as e:
+            logger.error(f"获取翻译新闻失败: {e}")
+    
+    return [
+        {
+            'title': '无法获取实时新闻' if lang == 'zh' else 'Unable to fetch real-time news',
+            'summary': '新闻服务暂时不可用，请稍后重试' if lang == 'zh' else 'News service temporarily unavailable, please try again later',
+            'url': 'https://finance.yahoo.com/news/markets/',
+            'source': '系统提示' if lang == 'zh' else 'System',
+            'published_at': '2025-07-09T15:30:00',
+            'sentiment': '中性' if lang == 'zh' else 'Neutral',
+            'sentiment_score': 0.5,
+            'tickers': []
+        }
+    ][:limit]
+
+@app.get("/api/market-updates/translated")
+def get_translated_market_updates(lang: str = Query('zh', description="语言")):
+    """获取翻译后的市场动态"""
+    if HAS_NEWS_SERVICE:
+        try:
+            news = real_news_service.get_market_news(10)
+            
+            # 如果需要翻译且翻译服务可用
+            if lang == 'zh' and HAS_TRANSLATION_SERVICE:
+                news = translation_service.translate_news_list(news, lang)
+            
+            logger.info(f"成功获取翻译后的市场动态 {len(news)} 条")
+            return news
+        except Exception as e:
+            logger.error(f"获取翻译市场动态失败: {e}")
+    
+    return [
+        {
+            'title': '无法获取实时市场动态' if lang == 'zh' else 'Unable to fetch real-time market updates',
+            'summary': '新闻服务暂时不可用，请稍后重试' if lang == 'zh' else 'News service temporarily unavailable, please try again later',
+            'url': 'https://finance.yahoo.com/news/markets/',
+            'source': '系统提示' if lang == 'zh' else 'System',
+            'published_at': '2025-07-09T15:30:00',
+            'sentiment': '中性' if lang == 'zh' else 'Neutral',
+            'sentiment_score': 0.5,
+            'tickers': []
+        }
+    ]
 
 if __name__ == "__main__":
     import uvicorn

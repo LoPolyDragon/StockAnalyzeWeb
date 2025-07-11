@@ -202,28 +202,31 @@
         <div class="bg-white shadow rounded-lg mb-8">
             <nav class="flex border-b">
                 <button id="tabDashboard" class="tab-btn px-6 py-4 font-semibold text-blue-600 tab-active">
-                    <i class="fas fa-tachometer-alt mr-2"></i>市场仪表板
+                    <i class="fas fa-tachometer-alt mr-2"></i><span data-i18n="market_dashboard">市场仪表盘</span>
                 </button>
                 <button id="tabStock" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
-                    <i class="fas fa-chart-candlestick mr-2"></i>股票分析
+                    <i class="fas fa-chart-candlestick mr-2"></i><span data-i18n="stock_analysis">股票分析</span>
                 </button>
                 <button id="tabFundamental" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
-                    <i class="fas fa-calculator mr-2"></i>基本面分析
+                    <i class="fas fa-calculator mr-2"></i><span data-i18n="fundamental_analysis">基本面分析</span>
                 </button>
                 <button id="tabRisk" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
-                    <i class="fas fa-shield-alt mr-2"></i>风险管理
+                    <i class="fas fa-shield-alt mr-2"></i><span data-i18n="risk_management">风险管理</span>
                 </button>
                 <button id="tabPortfolio" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
-                    <i class="fas fa-briefcase mr-2"></i>投资组合
+                    <i class="fas fa-briefcase mr-2"></i><span data-i18n="portfolio">投资组合</span>
                 </button>
                 <button id="tabTools" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
-                    <i class="fas fa-calculator mr-2"></i>投资工具
+                    <i class="fas fa-calculator mr-2"></i><span data-i18n="investment_tools">投资工具</span>
+                </button>
+                <button id="tabSettings" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
+                    <i class="fas fa-cog mr-2"></i><span data-i18n="settings">设置</span>
                 </button>
             </nav>
         </div>
 
-        <!-- Stock Search Section (Always Visible) -->
-        <div class="bg-white shadow rounded-lg p-6 mb-8">
+        <!-- Stock Search Section (Visible on Stock Analysis tabs) -->
+        <div id="stockSearchSection" class="bg-white shadow rounded-lg p-6 mb-8">
             <h2 class="text-2xl font-bold mb-6 flex items-center">
                 <i class="fas fa-search mr-3 text-blue-600"></i>智能股票分析
             </h2>
@@ -1425,6 +1428,47 @@
             </div>
         </div>
 
+        <!-- Settings Tab -->
+        <div id="settingsTab" class="tab-content hidden">
+            <div class="max-w-2xl mx-auto">
+                <div class="bg-white shadow rounded-lg p-8">
+                    <h3 class="text-2xl font-bold mb-8 flex items-center text-center justify-center">
+                        <i class="fas fa-language mr-3 text-blue-600"></i><span data-i18n="language_settings">语言设置</span>
+                    </h3>
+                    
+                    <!-- Language Selection -->
+                    <div class="text-center">
+                        <div class="mb-6">
+                            <label class="block text-lg font-medium text-gray-700 mb-4">
+                                <span data-i18n="select_language">选择语言</span>
+                            </label>
+                            <select id="languageSelect" class="w-full max-w-xs mx-auto border border-gray-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                                <option value="zh" data-i18n="chinese">中文</option>
+                                <option value="en" data-i18n="english">English</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-8">
+                            <label class="flex items-center justify-center">
+                                <input type="checkbox" id="autoTranslateNews" class="mr-3 h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <span class="text-gray-700" data-i18n="auto_translate_news">自动翻译新闻</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Save Button -->
+                        <button id="saveSettingsBtn" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors text-lg font-medium">
+                            <i class="fas fa-save mr-2"></i><span data-i18n="save_settings">保存设置</span>
+                        </button>
+                        
+                        <!-- Success Message -->
+                        <div id="settingsSuccess" class="mt-6 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg hidden">
+                            <i class="fas fa-check-circle mr-2"></i><span data-i18n="settings_saved">设置已保存</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     <!-- Footer -->
     <footer class="bg-gray-800 text-white py-8 mt-16">
         <div class="container mx-auto px-4 text-center">
@@ -1458,6 +1502,14 @@
                 // Show corresponding tab content
                 const tabId = this.id.replace('tab', '').toLowerCase() + 'Tab';
                 document.getElementById(tabId).classList.remove('hidden');
+                
+                // Control stock search section visibility
+                const stockSearchSection = document.getElementById('stockSearchSection');
+                if (tabId === 'settingsTab') {
+                    stockSearchSection.style.display = 'none';
+                } else {
+                    stockSearchSection.style.display = 'block';
+                }
                 
                 // Load data when dashboard tab is activated
                 if (tabId === 'dashboardTab') {
@@ -3639,6 +3691,176 @@
                 alert('添加关注失败，请重试');
             }
         }
+        // ==================== 多语言和设置功能 ====================
+        
+        let currentLanguage = localStorage.getItem('language') || 'zh';
+        let translations = {};
+        
+        // 加载翻译文本
+        async function loadTranslations(lang) {
+            try {
+                const response = await fetch(`/api/translations/${lang}`);
+                const data = await response.json();
+                if (data.success) {
+                    translations = data.data;
+                    updateUI();
+                }
+            } catch (error) {
+                console.error('Failed to load translations:', error);
+            }
+        }
+        
+        // 更新界面文本
+        function updateUI() {
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (translations[key]) {
+                    element.textContent = translations[key];
+                }
+            });
+        }
+        
+        // 切换语言
+        function switchLanguage(lang) {
+            currentLanguage = lang;
+            localStorage.setItem('language', lang);
+            loadTranslations(lang);
+            
+            // 更新语言选择器
+            document.getElementById('languageSelect').value = lang;
+            
+            // 重新加载新闻（如果需要翻译）
+            if (document.getElementById('dashboardTab').classList.contains('tab-content') && !document.getElementById('dashboardTab').classList.contains('hidden')) {
+                loadTranslatedNews();
+            }
+        }
+        
+        // 加载翻译后的新闻
+        async function loadTranslatedNews() {
+            try {
+                const autoTranslate = document.getElementById('autoTranslateNews').checked;
+                const lang = autoTranslate ? currentLanguage : 'en';
+                
+                document.getElementById('newsLoading').classList.remove('hidden');
+                document.getElementById('newsData').classList.add('hidden');
+                
+                const response = await fetch(`/api/market-updates/translated?lang=${lang}`);
+                const newsData = await response.json();
+                displayNews(newsData, 'market');
+                
+                document.getElementById('newsLoading').classList.add('hidden');
+                document.getElementById('newsData').classList.remove('hidden');
+            } catch (error) {
+                console.error('Failed to load translated news:', error);
+                document.getElementById('newsLoading').classList.add('hidden');
+            }
+        }
+        
+        // 保存设置
+        async function saveSettings() {
+            try {
+                const settings = {
+                    language: document.getElementById('languageSelect').value,
+                    auto_translate_news: document.getElementById('autoTranslateNews').checked
+                };
+                
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(settings)
+                });
+                
+                if (response.ok) {
+                    // 切换语言
+                    switchLanguage(settings.language);
+                    
+                    // 显示成功消息
+                    document.getElementById('settingsSuccess').classList.remove('hidden');
+                    setTimeout(() => {
+                        document.getElementById('settingsSuccess').classList.add('hidden');
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+            }
+        }
+        
+        // 初始化设置
+        async function initializeSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+                
+                document.getElementById('languageSelect').value = settings.language || 'zh';
+                document.getElementById('autoTranslateNews').checked = settings.auto_translate_news !== false;
+                
+                // 设置当前语言
+                currentLanguage = settings.language || 'zh';
+                localStorage.setItem('language', currentLanguage);
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+        
+        // 事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化设置
+            initializeSettings();
+            
+            // 加载翻译
+            loadTranslations(currentLanguage);
+            
+            // 语言选择器事件
+            document.getElementById('languageSelect').addEventListener('change', function() {
+                switchLanguage(this.value);
+            });
+            
+            // 保存设置按钮
+            document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+            
+            // 自动翻译新闻复选框
+            document.getElementById('autoTranslateNews').addEventListener('change', function() {
+                if (document.getElementById('dashboardTab').classList.contains('tab-content') && !document.getElementById('dashboardTab').classList.contains('hidden')) {
+                    loadTranslatedNews();
+                }
+            });
+        });
+        
+        // 修改原有的loadNews函数，支持翻译
+        const originalLoadNews = loadNews;
+        loadNews = async function(type = 'market', ticker = null) {
+            try {
+                const autoTranslate = document.getElementById('autoTranslateNews') ? document.getElementById('autoTranslateNews').checked : true;
+                const lang = autoTranslate ? currentLanguage : 'en';
+                
+                document.getElementById('newsLoading').classList.remove('hidden');
+                document.getElementById('newsData').classList.add('hidden');
+                document.getElementById('newsError').classList.add('hidden');
+                
+                let url;
+                if (type === 'stock' && ticker) {
+                    url = `/stock-updates/${ticker}`;
+                } else {
+                    url = `/api/market-updates/translated?lang=${lang}`;
+                }
+                
+                const response = await fetch(url);
+                if (response.ok) {
+                    const newsData = await response.json();
+                    displayNews(newsData, type);
+                } else {
+                    throw new Error('无法获取新闻数据');
+                }
+            } catch (error) {
+                console.error('新闻加载失败:', error);
+                document.getElementById('newsLoading').classList.add('hidden');
+                document.getElementById('newsError').classList.remove('hidden');
+                document.getElementById('newsErrorText').textContent = error.message;
+            }
+        };
+
     </script>
 </body>
 </html>
